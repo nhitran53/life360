@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'hub_screen.dart';
+
 void main() => runApp(const Friend360App());
 
 class Friend360App extends StatelessWidget {
@@ -64,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 500),
-        pageBuilder: (_, __, ___) => const NextPagePlaceholder(),
+        pageBuilder: (_, __, ___) => const HubScreen(),
         transitionsBuilder: (_, animation, __, child) {
           final curved =
           CurvedAnimation(parent: animation, curve: Curves.easeOutBack);
@@ -416,27 +418,6 @@ class _FloatingEmojis extends StatelessWidget {
             },
           );
         },
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// PLACEHOLDER for the next page — swap this out when you build it
-// ---------------------------------------------------------------------------
-
-class NextPagePlaceholder extends StatelessWidget {
-  const NextPagePlaceholder({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Friend 360')),
-      body: const Center(
-        child: Text(
-          'Next page coming soon 👀',
-          style: TextStyle(fontSize: 20),
-        ),
       ),
     );
   }
