@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'app_services.dart';
 import 'screens/leaderboard_screen.dart';
+import 'screens/my_stats_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'widgets/chunky.dart';
@@ -26,10 +28,13 @@ class _HubItem {
   final Color edgeColor;
 
   /// Null shows a "coming soon" page.
-  final Widget Function()? screen;
+  final Widget Function(AppServices)? screen;
 }
 
-Widget _leaderboard() => const LeaderboardScreen();
+Widget _myStats(AppServices s) => MyStatsScreen(services: s);
+
+Widget _leaderboard(AppServices s) =>
+    LeaderboardScreen(friends: s.friends, stats: s.stats);
 
 const _hubItems = [
   _HubItem(
@@ -38,6 +43,7 @@ const _hubItems = [
     subtitle: 'Steps, sleep, workouts and more',
     color: AppColors.primary,
     edgeColor: AppColors.primaryDark,
+    screen: _myStats,
   ),
   _HubItem(
     icon: Icons.group_rounded,
@@ -56,15 +62,25 @@ const _hubItems = [
   ),
 ];
 
-class HubScreen extends StatelessWidget {
-  const HubScreen({super.key});
+class HubScreen extends StatefulWidget {
+  const HubScreen({super.key, this.services});
+
+  /// Defaults to [AppServices.defaults] when omitted.
+  final AppServices? services;
+
+  @override
+  State<HubScreen> createState() => _HubScreenState();
+}
+
+class _HubScreenState extends State<HubScreen> {
+  late final AppServices _services = widget.services ?? AppServices.defaults();
 
   void _open(BuildContext context, _HubItem item) {
     final screen = item.screen;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => screen != null
-            ? screen()
+            ? screen(_services)
             : ComingSoonPage(title: item.title, icon: item.icon),
       ),
     );
