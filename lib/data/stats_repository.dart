@@ -1,0 +1,23 @@
+import '../models/models.dart';
+
+/// Source of health stats. Screens depend on this interface only, so the
+/// mock can later be swapped for HealthKit / Health Connect + Firestore.
+abstract interface class StatsRepository {
+  /// Daily stats for [userId] from [from] to [to] (both inclusive, by day),
+  /// oldest first. Days with no data are omitted.
+  Future<List<DailyStats>> dailyStats(
+    String userId, {
+    required DateTime from,
+    required DateTime to,
+  });
+
+  /// Summary of the week containing [weekOf] (defaults to this week).
+  Future<WeeklySummary> weeklySummary(String userId, {DateTime? weekOf});
+
+  /// The current user and their accepted friends ranked for [metric] over
+  /// the week containing [weekOf] (defaults to this week).
+  Future<List<LeaderboardEntry>> leaderboard(
+    StatMetric metric, {
+    DateTime? weekOf,
+  });
+}
