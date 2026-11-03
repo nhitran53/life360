@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Friend 360 reads your steps, sleep, workouts and active calories from Health to show your stats and rank you on the weekly leaderboard.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Friend 360 does not write to Health.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
