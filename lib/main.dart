@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'hub_screen.dart';
+import 'screens/circle_screen.dart';
 
 void main() => runApp(const Friend360App());
 
@@ -66,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 500),
-        pageBuilder: (_, __, ___) => const HubScreen(),
+        pageBuilder: (_, __, ___) => const CircleScreen(),
         transitionsBuilder: (_, animation, __, child) {
           final curved =
           CurvedAnimation(parent: animation, curve: Curves.easeOutBack);

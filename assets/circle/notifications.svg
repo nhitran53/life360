@@ -1,0 +1,11 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Notifications">
+<rect x="0.5" y="0.5" width="43" height="43" rx="21.5" fill="white"/>
+<rect x="0.5" y="0.5" width="43" height="43" rx="21.5" stroke="#E6E4DE"/>
+<g id="icon">
+<path id="Vector" d="M17 18.6667C17 17.3406 17.5268 16.0688 18.4645 15.1311C19.4021 14.1935 20.6739 13.6667 22 13.6667C23.3261 13.6667 24.5979 14.1935 25.5355 15.1311C26.4732 16.0688 27 17.3406 27 18.6667C27 24.5 29.5 26.1667 29.5 26.1667H14.5C14.5 26.1667 17 24.5 17 18.6667Z" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round" stroke="#15171C"/>
+<path id="Vector_2" d="M20.5833 29.5C20.7147 29.7633 20.9169 29.9847 21.1671 30.1395C21.4174 30.2942 21.7058 30.3762 22 30.3762C22.2942 30.3762 22.5826 30.2942 22.8329 30.1395C23.0831 29.9847 23.2853 29.7633 23.4167 29.5" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round" stroke="#15171C"/>
+</g>
+<path id="Ellipse" d="M34 14C34 16.2091 32.2091 18 30 18C27.7909 18 26 16.2091 26 14C26 11.7909 27.7909 10 30 10C32.2091 10 34 11.7909 34 14Z" fill="#D6304A" stroke-width="2" stroke="white"/>
+</g>
+</svg>
