@@ -1,0 +1,74 @@
+import 'dart:convert';
+
+import '../../models/models.dart';
+import 'health_source.dart';
+
+/// Dev-only [HealthSource] that reads a small daily-totals JSON produced
+/// outside the repo from a Google Takeout export:
+/// `{"days": [{"date": "yyyy-mm-dd", "steps": 0, "sleepMinutes": 0,
+/// "workoutMinutes": 0, "activeCalories": 0}]}`.
+///
+/// It holds totals only (no raw samples, heart rate or location) and never
+/// logs values. Not meant for release builds.
+class TakeoutHealthSource implements HealthSource {
+  TakeoutHealthSource({required this._load});
+
+  final Future<String> Function() _load;
+
+  @override
+  String get displayName => 'Google Takeout (dev)';
+
+  @override
+  Set<StatMetric> get readableMetrics => const {
+    StatMetric.steps,
+    StatMetric.sleep,
+    StatMetric.workout,
+    StatMetric.calories,
+  };
+
+  @override
+  Future<HealthAvailability> availability() async =>
+      HealthAvailability.available;
+
+  @override
+  Future<void> openInstallPage() async {}
+
+  @override
+  Future<HealthPermissionResult> requestPermissions() async =>
+      HealthPermissionResult({
+        for (final m in readableMetrics) m: HealthPermissionStatus.granted,
+      });
+
+  @override
+  Future<List<DailyStats>> fetchDailyStats(
+    String userId, {
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final start = dateOnly(from);
+    final end = dateOnly(to);
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(await _load());
+    } on Object {
+      return [];
+    }
+    final rows = decoded is Map ? decoded['days'] : null;
+    if (rows is! List) return [];
+    final days = <DailyStats>[];
+    for (final row in rows) {
+      try {
+        final r = Map<String, dynamic>.from(row as Map);
+        final s = DailyStats.fromJson({...r, 'userId': userId});
+        if (s.date.isBefore(start) || s.date.isAfter(end)) continue;
+        if (s.steps + s.sleepMinutes + s.workoutMinutes + s.activeCalories >
+            0) {
+          days.add(s);
+        }
+      } on Object {
+        continue; // skip malformed rows
+      }
+    }
+    return days..sort((a, b) => a.date.compareTo(b.date));
+  }
+}
