@@ -1,105 +1,116 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../data/mock_circle.dart';
 import '../theme/circle_colors.dart';
+import '../widgets/circle_widgets.dart';
+import 'member_detail_screen.dart';
+import 'nudge_screen.dart';
+import 'privacy_screen.dart';
 
 // ---------------------------------------------------------------------------
-// CIRCLE (HOME) — live pulse map of your circle + today's totals
+// CIRCLE — tab shell (Circle / Ranks / Nudges / Privacy) + the Circle home:
+// live pulse map of your circle and today's totals
 // ---------------------------------------------------------------------------
 
-const _assets = 'assets/circle';
+class CircleScreen extends StatefulWidget {
+  const CircleScreen({super.key, this.initialTab = CircleTab.circle});
 
-/// Placeholder data matching the Figma mock until the repositories
-/// expose heart rate and activity.
-class _Member {
-  const _Member({
-    required this.name,
-    required this.initial,
-    required this.color,
-    required this.status,
-    this.bpm,
-    this.steps,
-  });
+  final CircleTab initialTab;
 
-  final String name;
-  final String initial;
-  final Color color;
-  final String status;
-  final int? bpm;
-  final int? steps;
+  @override
+  State<CircleScreen> createState() => _CircleScreenState();
 }
 
-const _mom = _Member(
-  name: 'Mom',
-  initial: 'M',
-  color: CircleColors.avatarMom,
-  status: 'Walking · now',
-  bpm: 78,
-  steps: 8240,
-);
-const _dad = _Member(
-  name: 'Dad',
-  initial: 'D',
-  color: CircleColors.avatarDad,
-  status: '3,105 steps · idle 3h',
-);
-const _bao = _Member(
-  name: 'Bao',
-  initial: 'B',
-  color: CircleColors.avatarBao,
-  status: 'Running · 24 min',
-  bpm: 132,
-  steps: 11980,
-);
+class _CircleScreenState extends State<CircleScreen> {
+  late CircleTab _tab = widget.initialTab;
 
-const _stepsToday = 38412;
-const _stepsGoal = 50000;
+  CircleMember _nudgeRecipient = circleNudgeMembers.first;
 
-class CircleScreen extends StatelessWidget {
-  const CircleScreen({super.key});
+  /// Changes whenever a nudge is started from elsewhere, so the Nudges tab
+  /// starts fresh for the new recipient.
+  Key _nudgeKey = UniqueKey();
 
-  void _comingSoon(BuildContext context, String what) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$what is coming soon 👀')));
+  void _selectTab(CircleTab tab) {
+    if (tab == CircleTab.ranks) {
+      showCircleSnack(context, 'Ranks is coming soon 👀');
+      return;
+    }
+    setState(() => _tab = tab);
+  }
+
+  void _nudge(CircleMember member) {
+    setState(() {
+      _nudgeRecipient = member;
+      _nudgeKey = UniqueKey();
+      _tab = CircleTab.nudges;
+    });
+  }
+
+  void _openMember(CircleMember member) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MemberDetailScreen(
+          member: member,
+          onSelectTab: _selectTab,
+          onSendNote: _nudge,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: CircleColors.background,
-      bottomNavigationBar: _TabBar(
-        onTabTap: (label) => _comingSoon(context, label),
-      ),
+      bottomNavigationBar: CircleTabBar(active: _tab, onSelect: _selectTab),
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _Header(),
-              const SizedBox(height: 14),
-              const _PulseMap(),
-              const SizedBox(height: 14),
-              const _TogetherToday(steps: _stepsToday, goal: _stepsGoal),
-              const SizedBox(height: 14),
-              const _MemberRow(member: _mom),
-              const SizedBox(height: 8),
-              _MemberRow(
-                member: _dad,
-                onNudge: () {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                        const SnackBar(content: Text('Nudge sent to Dad 👋')));
-                },
-              ),
-              const SizedBox(height: 8),
-              const _MemberRow(member: _bao),
-            ],
-          ),
+        child: IndexedStack(
+          // Ranks never becomes active, so it has no page yet.
+          index: switch (_tab) {
+            CircleTab.circle || CircleTab.ranks => 0,
+            CircleTab.nudges => 1,
+            CircleTab.privacy => 2,
+          },
+          children: [
+            _CircleHome(onOpenMember: _openMember, onNudge: _nudge),
+            NudgeScreen(key: _nudgeKey, initialRecipient: _nudgeRecipient),
+            const PrivacyScreen(),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _CircleHome extends StatelessWidget {
+  const _CircleHome({required this.onOpenMember, required this.onNudge});
+
+  final ValueChanged<CircleMember> onOpenMember;
+  final ValueChanged<CircleMember> onNudge;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _Header(),
+          const SizedBox(height: 14),
+          const _PulseMap(),
+          const SizedBox(height: 14),
+          const _TogetherToday(steps: circleStepsToday, goal: circleStepsGoal),
+          for (final member in circleListMembers) ...[
+            SizedBox(height: member == circleListMembers.first ? 14 : 8),
+            _MemberRow(
+              member: member,
+              onTap: () => onOpenMember(member),
+              onNudge: member.idle ? () => onNudge(member) : null,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -127,7 +138,11 @@ class _Header extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SvgPicture.asset('$_assets/icon_users.svg', width: 16, height: 16),
+              SvgPicture.asset(
+                '$circleAssets/icon_users.svg',
+                width: 16,
+                height: 16,
+              ),
               const SizedBox(width: 8),
               const Text(
                 'Tran family',
@@ -138,8 +153,11 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              SvgPicture.asset('$_assets/icon_chevron_down.svg',
-                  width: 14, height: 14),
+              SvgPicture.asset(
+                '$circleAssets/icon_chevron_down.svg',
+                width: 14,
+                height: 14,
+              ),
             ],
           ),
         ),
@@ -149,13 +167,19 @@ class _Header extends StatelessWidget {
           height: 44,
           child: Stack(
             children: [
-              SvgPicture.asset('$_assets/notifications.svg',
-                  width: 44, height: 44),
+              SvgPicture.asset(
+                '$circleAssets/notifications.svg',
+                width: 44,
+                height: 44,
+              ),
               Positioned(
                 left: 25,
                 top: 9,
-                child: SvgPicture.asset('$_assets/notification_dot.svg',
-                    width: 10, height: 10),
+                child: SvgPicture.asset(
+                  '$circleAssets/notification_dot.svg',
+                  width: 10,
+                  height: 10,
+                ),
               ),
             ],
           ),
@@ -250,12 +274,20 @@ class _PulseMap extends StatelessWidget {
     );
   }
 
-  static Widget _svgAt(String name,
-      {required double left, required double top, required double size}) {
+  static Widget _svgAt(
+    String name, {
+    required double left,
+    required double top,
+    required double size,
+  }) {
     return Positioned(
       left: left,
       top: top,
-      child: SvgPicture.asset('$_assets/$name.svg', width: size, height: size),
+      child: SvgPicture.asset(
+        '$circleAssets/$name.svg',
+        width: size,
+        height: size,
+      ),
     );
   }
 }
@@ -280,10 +312,11 @@ class _MapMember extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _Avatar(
+        MemberAvatar(
           initial: initial,
           color: color,
           size: size,
+          fontSize: size > 44 ? 17 : 14,
           ringColor: ringColor,
         ),
         const SizedBox(height: 4),
@@ -307,7 +340,7 @@ class _HeartBadge extends StatelessWidget {
       color: alert ? CircleColors.alert : CircleColors.surface,
       children: [
         SvgPicture.asset(
-          '$_assets/${alert ? 'icon_heart_white' : 'icon_heart'}.svg',
+          '$circleAssets/${alert ? 'icon_heart_white' : 'icon_heart'}.svg',
           width: 10,
           height: 10,
         ),
@@ -381,7 +414,7 @@ class _LiveChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset('$_assets/live_dot.svg', width: 7, height: 7),
+          SvgPicture.asset('$circleAssets/live_dot.svg', width: 7, height: 7),
           const SizedBox(width: 6),
           const Text(
             'Live · synced 1 min ago',
@@ -392,51 +425,6 @@ class _LiveChip extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// AVATAR — colored circle with an initial
-// ---------------------------------------------------------------------------
-
-class _Avatar extends StatelessWidget {
-  const _Avatar({
-    required this.initial,
-    required this.color,
-    this.size = 44,
-    this.ringColor,
-  });
-
-  final String initial;
-  final Color color;
-  final double size;
-
-  /// Optional 3px ring (used on the pulse map).
-  final Color? ringColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final isYou = color == CircleColors.avatarYou;
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: ringColor == null
-            ? null
-            : Border.all(color: ringColor!, width: 3),
-      ),
-      child: Text(
-        initial,
-        style: TextStyle(
-          fontSize: isYou ? 17 : 14,
-          fontWeight: FontWeight.w800,
-          color: isYou ? Colors.white : CircleColors.ink,
-        ),
       ),
     );
   }
@@ -461,7 +449,7 @@ class _TogetherToday extends StatelessWidget {
       color: CircleColors.secondary,
     );
 
-    return _Card(
+    return CircleCard(
       radius: 20,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
@@ -471,11 +459,14 @@ class _TogetherToday extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Flexible(
-                child: Text('Together today',
-                    style: label, overflow: TextOverflow.ellipsis),
+                child: Text(
+                  'Together today',
+                  style: label,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const SizedBox(width: 8),
-              Text('Goal ${_formatNumber(goal)}', style: label),
+              Text('Goal ${formatNumber(goal)}', style: label),
             ],
           ),
           const SizedBox(height: 10),
@@ -484,7 +475,7 @@ class _TogetherToday extends StatelessWidget {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                _formatNumber(steps),
+                formatNumber(steps),
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
@@ -534,236 +525,93 @@ class _TogetherToday extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _MemberRow extends StatelessWidget {
-  const _MemberRow({required this.member, this.onNudge});
+  const _MemberRow({required this.member, required this.onTap, this.onNudge});
 
-  final _Member member;
+  final CircleMember member;
+  final VoidCallback onTap;
 
   /// When set, shows a Nudge button instead of heart rate + steps.
   final VoidCallback? onNudge;
 
   @override
   Widget build(BuildContext context) {
-    final bpm = member.bpm;
-    final steps = member.steps;
+    final onNudge = this.onNudge;
 
-    return _Card(
-      radius: 18,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          _Avatar(initial: member.initial, color: member.color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  member.name,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: CircleColors.ink,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  member.status,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: CircleColors.secondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          if (onNudge != null)
-            _NudgeButton(onPressed: onNudge!)
-          else if (bpm != null && steps != null)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '$bpm bpm',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: CircleColors.heart,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${_formatNumber(steps)} steps',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: CircleColors.secondary,
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NudgeButton extends StatelessWidget {
-  const _NudgeButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
     return Material(
-      color: CircleColors.ink,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onPressed,
+      color: CircleColors.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        child: Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+        side: const BorderSide(color: CircleColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              SvgPicture.asset('$_assets/icon_send.svg', width: 16, height: 16),
-              const SizedBox(width: 8),
-              const Text(
-                'Nudge',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+              MemberAvatar(initial: member.initial, color: member.color),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      member.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: CircleColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      member.status,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: CircleColors.secondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 12),
+              if (onNudge != null)
+                CirclePillButton(
+                  label: 'Nudge',
+                  icon: 'icon_send',
+                  filled: true,
+                  onPressed: onNudge,
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${member.bpm} bpm',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: CircleColors.heart,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${formatNumber(member.steps)} steps',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: CircleColors.secondary,
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
       ),
     );
   }
-}
-
-class _Card extends StatelessWidget {
-  const _Card({
-    required this.radius,
-    required this.padding,
-    required this.child,
-  });
-
-  final double radius;
-  final EdgeInsets padding;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: CircleColors.surface,
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: CircleColors.border),
-      ),
-      child: child,
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// TAB BAR — Circle / Ranks / Nudges / Privacy
-// ---------------------------------------------------------------------------
-
-class _TabBar extends StatelessWidget {
-  const _TabBar({required this.onTabTap});
-
-  /// Called with the tab's label for tabs that aren't built yet.
-  final ValueChanged<String> onTabTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-      decoration: const BoxDecoration(
-        color: CircleColors.surface,
-        border: Border(top: BorderSide(color: CircleColors.border)),
-      ),
-      child: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.only(bottom: 28),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const _Tab(icon: 'tab_circle', label: 'Circle', active: true),
-            _Tab(
-                icon: 'tab_ranks',
-                label: 'Ranks',
-                onTap: () => onTabTap('Ranks')),
-            _Tab(
-                icon: 'tab_nudges',
-                label: 'Nudges',
-                onTap: () => onTabTap('Nudges')),
-            _Tab(
-                icon: 'tab_privacy',
-                label: 'Privacy',
-                onTap: () => onTabTap('Privacy')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Tab extends StatelessWidget {
-  const _Tab({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.onTap,
-  });
-
-  final String icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 64, minHeight: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SvgPicture.asset('$_assets/$icon.svg', width: 22, height: 22),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: active ? FontWeight.w800 : FontWeight.w700,
-                color: active ? CircleColors.ink : CircleColors.muted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 38412 → "38,412".
-String _formatNumber(int n) {
-  final digits = n.toString();
-  final buf = StringBuffer();
-  for (var i = 0; i < digits.length; i++) {
-    if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
-    buf.write(digits[i]);
-  }
-  return buf.toString();
 }
