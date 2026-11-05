@@ -48,11 +48,18 @@ class MockStatsRepository implements StatsRepository {
   Future<List<LeaderboardEntry>> leaderboard(
     StatMetric metric, {
     DateTime? weekOf,
-  }) async {
+  }) async =>
+      rankLeaderboard(metric, await _summaries(weekOf));
+
+  @override
+  Future<List<LeaderboardEntry>> xpLeaderboard({DateTime? weekOf}) async =>
+      rankLeaderboardByXp(await _summaries(weekOf));
+
+  /// Weekly summaries for the current user and their accepted friends.
+  Future<Map<UserProfile, WeeklySummary>> _summaries(DateTime? weekOf) async {
     final people = [await _friends.currentUser(), ...await _friends.friends()];
-    final summaries = {
+    return {
       for (final p in people) p: await weeklySummary(p.id, weekOf: weekOf),
     };
-    return rankLeaderboard(metric, summaries);
   }
 }

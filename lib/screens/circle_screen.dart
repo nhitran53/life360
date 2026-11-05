@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/circle_colors.dart';
+import 'leaderboard_screen.dart';
 
 // ---------------------------------------------------------------------------
 // CIRCLE (HOME) — live pulse map of your circle + today's totals
@@ -69,7 +70,10 @@ class CircleScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: CircleColors.background,
       bottomNavigationBar: _TabBar(
-        onTabTap: (label) => _comingSoon(context, label),
+        onTabTap: (label) => label == 'Ranks'
+            ? Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const LeaderboardScreen()))
+            : _comingSoon(context, label),
       ),
       body: SafeArea(
         bottom: false,
