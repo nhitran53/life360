@@ -63,6 +63,15 @@ void main() {
     );
   });
 
+  test('joined and created circles cannot be edited either', () async {
+    final repo = MockCircleRepository();
+    final joined = await repo.joinByCode('FAM777');
+    expect(() => joined.memberIds.clear(), throwsUnsupportedError);
+    final again = (await repo.circles()).firstWhere((c) => c.id == 'c_fam');
+    expect(() => again.memberIds.add('x'), throwsUnsupportedError);
+    expect(again.memberIds, contains('u_me'));
+  });
+
   test('returned circles cannot be edited or leak into other repos', () async {
     final repo = MockCircleRepository();
     final gym = (await repo.circles()).first;

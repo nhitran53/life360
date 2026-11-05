@@ -83,7 +83,9 @@ class MockCircleRepository implements CircleRepository {
     if (i < 0) throw const CircleException('No circle has that code.');
     final circle = _circles[i];
     if (circle.hasMember(_me)) return circle;
-    return _circles[i] = circle.copyWith(memberIds: [...circle.memberIds, _me]);
+    return _circles[i] = _frozen(
+      circle.copyWith(memberIds: [...circle.memberIds, _me]),
+    );
   }
 
   @override
