@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'models/stat_metric.dart';
 import 'screens/circle_screen.dart';
+import 'screens/privacy_policy_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'theme/stat_colors.dart';
@@ -21,6 +22,9 @@ class Friend360App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: const HomeScreen(),
+      routes: {
+        privacyPolicyRoute: (_) => const PrivacyPolicyScreen(),
+      },
     );
   }
 }
