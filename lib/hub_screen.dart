@@ -31,7 +31,8 @@ class _HubItem {
   final Widget Function(AppServices)? screen;
 }
 
-Widget _myStats(AppServices s) => MyStatsScreen(services: s);
+Widget _myStats(AppServices s) =>
+    MyStatsScreen(friends: s.friends, stats: s.stats);
 
 Widget _leaderboard(AppServices s) =>
     LeaderboardScreen(friends: s.friends, stats: s.stats);

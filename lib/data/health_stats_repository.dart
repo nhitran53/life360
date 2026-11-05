@@ -114,17 +114,34 @@ class HealthStatsRepository implements ConnectableStatsRepository {
   Future<List<LeaderboardEntry>> leaderboard(
     StatMetric metric, {
     DateTime? weekOf,
-  }) async => rankLeaderboard(metric, await _summaries(weekOf));
+    Iterable<String>? userIds,
+  }) async => rankLeaderboard(metric, await _summaries(weekOf, userIds));
 
   @override
-  Future<List<LeaderboardEntry>> xpLeaderboard({DateTime? weekOf}) async =>
-      rankLeaderboardByXp(await _summaries(weekOf));
+  Future<List<LeaderboardEntry>> xpLeaderboard({
+    DateTime? weekOf,
+    Iterable<String>? userIds,
+  }) async => rankLeaderboardByXp(await _summaries(weekOf, userIds));
 
-  /// Weekly summaries for the current user and their accepted friends.
-  Future<Map<UserProfile, WeeklySummary>> _summaries(DateTime? weekOf) async {
-    final people = [await _friends.currentUser(), ...await _friends.friends()];
+  /// Weekly summaries for the current user plus their accepted friends, or
+  /// plus just [userIds] when given (unknown ids are skipped).
+  Future<Map<UserProfile, WeeklySummary>> _summaries(
+    DateTime? weekOf,
+    Iterable<String>? userIds,
+  ) async {
+    final me = await _friends.currentUser();
+    final others = <UserProfile>[];
+    if (userIds == null) {
+      others.addAll(await _friends.friends());
+    } else {
+      for (final id in userIds.toSet()) {
+        final user = await _friends.userById(id);
+        if (user != null && user.id != me.id) others.add(user);
+      }
+    }
     return {
-      for (final p in people) p: await weeklySummary(p.id, weekOf: weekOf),
+      for (final p in [me, ...others])
+        p: await weeklySummary(p.id, weekOf: weekOf),
     };
   }
 }

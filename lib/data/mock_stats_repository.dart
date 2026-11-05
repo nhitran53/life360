@@ -20,24 +20,24 @@ class MockStatsRepository implements StatsRepository {
 
   @override
   Future<List<DailyStats>> dailyStats(
-    String userId, {
-    required DateTime from,
-    required DateTime to,
-  }) async {
+      String userId, {
+        required DateTime from,
+        required DateTime to,
+      }) async {
     final start = dateOnly(from);
     final end = dateOnly(to);
     return _stats
         .where((s) =>
-            s.userId == userId &&
-            !s.date.isBefore(start) &&
-            !s.date.isAfter(end))
+    s.userId == userId &&
+        !s.date.isBefore(start) &&
+        !s.date.isAfter(end))
         .toList()
       ..sort((a, b) => a.date.compareTo(b.date));
   }
 
   @override
   Future<WeeklySummary> weeklySummary(String userId,
-          {DateTime? weekOf}) async =>
+      {DateTime? weekOf}) async =>
       WeeklySummary.fromDays(
         userId: userId,
         weekStart: weekOf ?? _clock(),
@@ -46,18 +46,36 @@ class MockStatsRepository implements StatsRepository {
 
   @override
   Future<List<LeaderboardEntry>> leaderboard(
-    StatMetric metric, {
-    DateTime? weekOf,
-  }) async =>
-      rankLeaderboard(metric, await _summaries(weekOf));
+      StatMetric metric, {
+        DateTime? weekOf,
+        Iterable<String>? userIds,
+      }) async =>
+      rankLeaderboard(metric, await _summaries(weekOf, userIds));
 
   @override
-  Future<List<LeaderboardEntry>> xpLeaderboard({DateTime? weekOf}) async =>
-      rankLeaderboardByXp(await _summaries(weekOf));
+  Future<List<LeaderboardEntry>> xpLeaderboard({
+    DateTime? weekOf,
+    Iterable<String>? userIds,
+  }) async =>
+      rankLeaderboardByXp(await _summaries(weekOf, userIds));
 
-  /// Weekly summaries for the current user and their accepted friends.
-  Future<Map<UserProfile, WeeklySummary>> _summaries(DateTime? weekOf) async {
-    final people = [await _friends.currentUser(), ...await _friends.friends()];
+  /// Weekly summaries for the current user plus their accepted friends, or
+  /// plus just [userIds] when given (unknown ids are skipped).
+  Future<Map<UserProfile, WeeklySummary>> _summaries(
+      DateTime? weekOf,
+      Iterable<String>? userIds,
+      ) async {
+    final me = await _friends.currentUser();
+    final others = <UserProfile>[];
+    if (userIds == null) {
+      others.addAll(await _friends.friends());
+    } else {
+      for (final id in userIds.toSet()) {
+        final user = await _friends.userById(id);
+        if (user != null && user.id != me.id) others.add(user);
+      }
+    }
+    final people = [me, ...others];
     return {
       for (final p in people) p: await weeklySummary(p.id, weekOf: weekOf),
     };

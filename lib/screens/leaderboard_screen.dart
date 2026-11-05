@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../data/family_store.dart';
 import '../data/friends_repository.dart';
+import '../data/mock_circle.dart';
 import '../data/mock_friends_repository.dart';
 import '../data/mock_stats_repository.dart';
 import '../data/stats_repository.dart';
@@ -10,7 +12,9 @@ import '../models/models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/stat_colors.dart';
+import '../utils/format.dart';
 import '../widgets/chunky.dart';
+import 'my_stats_screen.dart';
 
 // ---------------------------------------------------------------------------
 // LEADERBOARD — weekly ranking among friends, top 3 on a podium
@@ -38,29 +42,42 @@ enum LeaderboardBoard {
 
   /// One line explaining what the number means.
   String get caption => switch (this) {
-        xp => 'XP from steps, workouts, sleep and screen time.',
-        steps => 'Total steps this week.',
-        sleep => 'Average sleep per night.',
-        workout => 'Total workout minutes this week.',
-        screenTime => 'Average per day. Less wins.',
-      };
+    xp => 'XP from steps, workouts, sleep and screen time.',
+    steps => 'Total steps this week.',
+    sleep => 'Average sleep per night.',
+    workout => 'Total workout minutes this week.',
+    screenTime => 'Average per day. Less wins.',
+  };
 
   /// How a leaderboard value reads, e.g. "62,140 steps" or "7h 12m".
   String format(double value) => switch (this) {
-        xp => '${formatThousands(value.round())} XP',
-        steps => '${formatThousands(value.round())} steps',
-        workout => '${formatThousands(value.round())} min',
-        sleep || screenTime => formatMinutes(value.round()),
-      };
+    xp => '${formatThousands(value.round())} XP',
+    steps => '${formatThousands(value.round())} steps',
+    workout => '${formatThousands(value.round())} min',
+    sleep || screenTime => formatMinutes(value.round()),
+  };
 }
 
 class LeaderboardScreen extends StatefulWidget {
-  const LeaderboardScreen({super.key, this.friends, this.stats, this.clock});
+  const LeaderboardScreen({
+    super.key,
+    this.friends,
+    this.stats,
+    this.clock,
+    this.initialFamily,
+    this.familyStore,
+  });
 
   /// Defaults to mock repositories until the backend exists.
   final FriendsRepository? friends;
   final StatsRepository? stats;
   final DateTime Function()? clock;
+
+  /// Which family to rank at first. Null ranks all your friends.
+  final CircleFamily? initialFamily;
+
+  /// Families you can switch to. Defaults to [FamilyStore.instance].
+  final FamilyStore? familyStore;
 
   @override
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
@@ -93,40 +110,92 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   late final StatsRepository _stats =
       widget.stats ?? MockStatsRepository(friends: _friends, clock: _clock);
 
+  late final FamilyStore _familyStore =
+      widget.familyStore ?? FamilyStore.instance;
+
   var _board = LeaderboardBoard.xp;
-  final _cache = <LeaderboardBoard, Future<_BoardData>>{};
 
-  Future<_BoardData> _load(LeaderboardBoard board) =>
-      _cache.putIfAbsent(board, () async {
-        final now = _clock();
-        final lastWeek = DateTime(now.year, now.month, now.day - 7);
-        Future<List<LeaderboardEntry>> fetch(DateTime weekOf) {
-          final metric = board.metric;
-          return metric == null
-              ? _stats.xpLeaderboard(weekOf: weekOf)
-              : _stats.leaderboard(metric, weekOf: weekOf);
-        }
+  /// Null = all friends.
+  late CircleFamily? _family = widget.initialFamily;
 
-        final results = await Future.wait([fetch(now), fetch(lastWeek)]);
-        final me = await _friends.currentUser();
-        return _BoardData(
-          entries: results[0],
-          lastWeekRanks: {for (final e in results[1]) e.user.id: e.rank},
-          meId: me.id,
-        );
-      });
+  /// Keyed by [_key] so each family + board is only loaded once.
+  final _cache = <String, Future<_BoardData>>{};
+
+  String get _key => '${_family?.id ?? 'friends'}/${_board.name}';
+
+  Future<_BoardData> _load() {
+    final board = _board;
+    final userIds = _family?.profileIds;
+    return _cache.putIfAbsent(_key, () async {
+      final now = _clock();
+      final lastWeek = DateTime(now.year, now.month, now.day - 7);
+      Future<List<LeaderboardEntry>> fetch(DateTime weekOf) {
+        final metric = board.metric;
+        return metric == null
+            ? _stats.xpLeaderboard(weekOf: weekOf, userIds: userIds)
+            : _stats.leaderboard(metric, weekOf: weekOf, userIds: userIds);
+      }
+
+      final results = await Future.wait([fetch(now), fetch(lastWeek)]);
+      final me = await _friends.currentUser();
+      return _BoardData(
+        entries: results[0],
+        lastWeekRanks: {for (final e in results[1]) e.user.id: e.rank},
+        meId: me.id,
+      );
+    });
+  }
+
+  Future<void> _pickFamily() async {
+    final choice = await showModalBottomSheet<_ScopeChoice>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _ScopeSheet(
+        families: _familyStore.families,
+        selected: _family,
+      ),
+    );
+    if (choice == null || !mounted) return;
+    setState(() => _family = choice.family);
+  }
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Leaderboard')),
+      appBar: AppBar(
+        title: const Text('Leaderboard'),
+        actions: [
+          IconButton(
+            tooltip: 'My stats',
+            icon: const Icon(Icons.insights_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MyStatsScreen(
+                    friends: _friends, stats: _stats, clock: _clock),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: _ScopeButton(
+                label: _family?.name ?? 'All friends',
+                onTap: _pickFamily,
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: Row(
@@ -149,7 +218,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             ),
             Expanded(
               child: FutureBuilder<_BoardData>(
-                future: _load(_board),
+                future: _load(),
                 builder: (context, snapshot) {
                   final Widget child;
                   if (snapshot.hasError) {
@@ -157,7 +226,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       key: const ValueKey('error'),
                       text: "Couldn't load the leaderboard. "
                           'Check your connection and try again.',
-                      onRetry: () => setState(() => _cache.remove(_board)),
+                      onRetry: () => setState(() => _cache.remove(_key)),
                     );
                   } else if (!snapshot.hasData) {
                     child = const Center(
@@ -165,10 +234,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       child: CircularProgressIndicator(),
                     );
                   } else {
+                    final family = _family;
                     child = _BoardView(
-                      key: ValueKey(_board),
+                      key: ValueKey(_key),
                       board: _board,
                       data: snapshot.data!,
+                      soloText: family == null
+                          ? null
+                          : "It's just you in ${family.name} so far. "
+                          'Invite people to start a leaderboard 🏁',
                     );
                   }
                   return AnimatedSwitcher(
@@ -180,6 +254,189 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FAMILY PICKER — whose leaderboard: all friends or one of your families
+// ---------------------------------------------------------------------------
+
+class _ScopeButton extends StatelessWidget {
+  const _ScopeButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ChunkySurface(
+        key: const ValueKey('scope-button'),
+        color: AppColors.surface,
+        edgeColor: AppColors.border,
+        borderColor: AppColors.border,
+        radius: AppRadius.chip,
+        depth: AppDepth.chip,
+        semanticLabel: 'Showing $label. Switch leaderboard',
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        onTap: onTap,
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.groups_rounded, size: 20, color: AppColors.ink),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(color: AppColors.ink, letterSpacing: 0),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.expand_more_rounded,
+                  size: 22, color: AppColors.inkSoft),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What the sheet closes with. [family] null = all friends.
+class _ScopeChoice {
+  const _ScopeChoice(this.family);
+  final CircleFamily? family;
+}
+
+class _ScopeSheet extends StatelessWidget {
+  const _ScopeSheet({required this.families, required this.selected});
+
+  final List<CircleFamily> families;
+
+  /// Null = all friends.
+  final CircleFamily? selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Whose leaderboard?', style: text.titleLarge),
+            const SizedBox(height: 2),
+            Text('Compare with all your friends or one family',
+                style: text.bodySmall),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _ScopeOption(
+                      icon: Icons.public_rounded,
+                      title: 'All friends',
+                      subtitle: 'Everyone you’ve added',
+                      selected: selected == null,
+                      onTap: () =>
+                          Navigator.of(context).pop(const _ScopeChoice(null)),
+                    ),
+                    for (final family in families) ...[
+                      const SizedBox(height: 10),
+                      _ScopeOption(
+                        icon: Icons.groups_rounded,
+                        title: family.name,
+                        subtitle: family.memberCount == 1
+                            ? 'Just you so far'
+                            : '${family.memberCount} members',
+                        selected: family.id == selected?.id,
+                        onTap: () =>
+                            Navigator.of(context).pop(_ScopeChoice(family)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScopeOption extends StatelessWidget {
+  const _ScopeOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return ChunkySurface(
+      color: selected ? AppColors.primaryTint : AppColors.surface,
+      edgeColor: selected ? AppColors.primaryDark : AppColors.border,
+      borderColor: selected ? AppColors.primary : AppColors.border,
+      radius: AppRadius.card,
+      depth: AppDepth.card,
+      selected: selected,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.surfaceSunken,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 22, color: AppColors.ink),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.titleSmall),
+                Text(subtitle, style: text.bodySmall),
+              ],
+            ),
+          ),
+          if (selected)
+            const Icon(Icons.check_circle_rounded,
+                color: AppColors.primary, size: 24),
+        ],
       ),
     );
   }
@@ -256,14 +513,26 @@ class _BoardPicker extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _BoardView extends StatelessWidget {
-  const _BoardView({super.key, required this.board, required this.data});
+  const _BoardView({
+    super.key,
+    required this.board,
+    required this.data,
+    this.soloText,
+  });
 
   final LeaderboardBoard board;
   final _BoardData data;
 
+  /// Shown instead of a one-person podium (e.g. a brand-new family).
+  final String? soloText;
+
   @override
   Widget build(BuildContext context) {
     final entries = data.entries;
+    final soloText = this.soloText;
+    if (soloText != null && entries.length < 2) {
+      return _Message(text: soloText);
+    }
     if (entries.isEmpty) {
       return const _Message(
           text: 'Add friends to start a leaderboard. '
@@ -352,18 +621,18 @@ class _PodiumState extends State<_Podium> with SingleTickerProviderStateMixin {
           Expanded(
             child: place < widget.top.length
                 ? _PodiumSpot(
-                    key: ValueKey('podium-${place + 1}'),
-                    board: widget.board,
-                    entry: widget.top[place],
-                    medal: _medals[place],
-                    isMe: widget.top[place].user.id == widget.data.meId,
-                    movement: widget.data.movement(widget.top[place]),
-                    rise: CurvedAnimation(
-                      parent: _rise,
-                      curve: Interval(starts[place], starts[place] + 0.7,
-                          curve: Curves.easeOutBack),
-                    ),
-                  )
+              key: ValueKey('podium-${place + 1}'),
+              board: widget.board,
+              entry: widget.top[place],
+              medal: _medals[place],
+              isMe: widget.top[place].user.id == widget.data.meId,
+              movement: widget.data.movement(widget.top[place]),
+              rise: CurvedAnimation(
+                parent: _rise,
+                curve: Interval(starts[place], starts[place] + 0.7,
+                    curve: Curves.easeOutBack),
+              ),
+            )
                 : const SizedBox.shrink(),
           ),
       ],
@@ -496,13 +765,13 @@ String nudgeMessage(
   return switch (board) {
     LeaderboardBoard.xp => '${formatThousands(gap)} XP to pass $name 👀',
     LeaderboardBoard.steps =>
-      "You're ${formatThousands(gap)} steps behind $name 👀",
+    "You're ${formatThousands(gap)} steps behind $name 👀",
     LeaderboardBoard.sleep =>
-      '${formatMinutes(gap)} more sleep a night to pass $name 😴',
+    '${formatMinutes(gap)} more sleep a night to pass $name 😴',
     LeaderboardBoard.workout =>
-      '${formatThousands(gap)} workout minutes to pass $name 💪',
+    '${formatThousands(gap)} workout minutes to pass $name 💪',
     LeaderboardBoard.screenTime =>
-      'Cut ${formatMinutes(gap)} a day to pass $name 📵',
+    'Cut ${formatMinutes(gap)} a day to pass $name 📵',
   };
 }
 
@@ -675,25 +944,6 @@ String weekResetLabel(DateTime now) {
     return 'Resets in $h ${h == 1 ? 'hour' : 'hours'}';
   }
   return 'Resets in ${math.max(1, left.inMinutes)} min';
-}
-
-/// 38412 → "38,412".
-String formatThousands(int n) {
-  final digits = n.abs().toString();
-  final buf = StringBuffer(n < 0 ? '-' : '');
-  for (var i = 0; i < digits.length; i++) {
-    if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
-    buf.write(digits[i]);
-  }
-  return buf.toString();
-}
-
-/// 432 → "7h 12m", 45 → "45m".
-String formatMinutes(int minutes) {
-  final h = minutes ~/ 60;
-  final m = minutes % 60;
-  if (h == 0) return '${m}m';
-  return '${h}h ${m.toString().padLeft(2, '0')}m';
 }
 
 String ordinal(int n) {
