@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../app_services.dart';
+import '../data/health/health_source.dart';
+import '../data/health_stats_repository.dart';
 import '../models/models.dart';
+import '../theme/app_colors.dart';
+import '../widgets/chunky.dart';
 
 const _shown = [
   StatMetric.steps,
@@ -15,8 +19,8 @@ String formatStat(StatMetric m, num v) {
   return '${v.round()} ${m.unit}';
 }
 
-/// Today's and this week's stats for the current user, with a button to
-/// connect Apple Health / Health Connect.
+/// Today's and this week's stats for the current user, with a card to
+/// connect and sync Apple Health / Health Connect.
 class MyStatsScreen extends StatefulWidget {
   const MyStatsScreen({super.key, required this.services});
 
@@ -28,32 +32,43 @@ class MyStatsScreen extends StatefulWidget {
 
 class _MyStatsScreenState extends State<MyStatsScreen> {
   bool _busy = false;
-  String? _message;
+  bool _failed = false;
   late Future<_Data> _data = _load();
+
+  HealthStatsRepository get _stats => widget.services.stats;
 
   Future<_Data> _load() async {
     final me = await widget.services.friends.currentUser();
     final today = DateTime.now();
-    final days = await widget.services.stats
-        .dailyStats(me.id, from: today, to: today);
-    final week = await widget.services.stats.weeklySummary(me.id);
+    final days = await _stats.dailyStats(me.id, from: today, to: today);
+    final week = await _stats.weeklySummary(me.id);
     return _Data(days.isEmpty ? null : days.first, week);
   }
 
   Future<void> _connect() async {
     setState(() => _busy = true);
-    final ok = await widget.services.stats.connect();
+    var failed = false;
+    try {
+      await _stats.connect();
+    } catch (_) {
+      // Never surface or log the error text: it could carry health details.
+      failed = true;
+    }
     if (!mounted) return;
     setState(() {
       _busy = false;
-      _message = ok ? null : 'Could not get health access. Check permissions.';
+      _failed = failed;
       _data = _load();
     });
   }
 
+  Future<void> _install() async {
+    await _stats.openInstallPage();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final connected = widget.services.stats.isConnected;
+    final denied = _stats.deniedMetrics;
     return Scaffold(
       appBar: AppBar(title: const Text('My Stats')),
       body: FutureBuilder<_Data>(
@@ -66,48 +81,198 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Card(
-                child: ListTile(
-                  leading: Icon(connected ? Icons.favorite : Icons.sync),
-                  title: Text(connected
-                      ? 'Health connected'
-                      : 'Showing demo data'),
-                  subtitle: Text(_message ??
-                      (connected
-                          ? 'Synced from your health app'
-                          : 'Connect to sync your real stats')),
-                  trailing: FilledButton(
-                    onPressed: _busy ? null : _connect,
-                    child: Text(connected ? 'Refresh' : 'Connect'),
-                  ),
-                ),
+              _ConnectCard(
+                stats: _stats,
+                busy: _busy,
+                failed: _failed,
+                onConnect: _connect,
+                onInstall: _install,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               Text('Today', style: Theme.of(context).textTheme.titleLarge),
               for (final m in _shown)
-                ListTile(
-                  leading: Text(m.emoji, style: const TextStyle(fontSize: 28)),
-                  title: Text(m.label),
-                  trailing: Text(
-                    d.today == null ? '–' : formatStat(m, m.valueOf(d.today!)),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                _StatRow(
+                  metric: m,
+                  denied: denied.contains(m),
+                  value: d.today == null
+                      ? '–'
+                      : formatStat(m, m.valueOf(d.today!)),
                 ),
               const SizedBox(height: 8),
               Text('This week', style: Theme.of(context).textTheme.titleLarge),
               for (final m in _shown)
-                ListTile(
-                  leading: Text(m.emoji, style: const TextStyle(fontSize: 28)),
-                  title: Text(m.label),
-                  subtitle: Text(m.rankByAverage ? 'daily average' : 'total'),
-                  trailing: Text(
-                    formatStat(m, m.leaderboardValue(d.week)),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                _StatRow(
+                  metric: m,
+                  denied: denied.contains(m),
+                  subtitle: m.rankByAverage ? 'daily average' : 'total',
+                  value: formatStat(m, m.leaderboardValue(d.week)),
                 ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// A stat line. A denied metric says so instead of showing a fake 0.
+class _StatRow extends StatelessWidget {
+  const _StatRow({
+    required this.metric,
+    required this.denied,
+    required this.value,
+    this.subtitle,
+  });
+
+  final StatMetric metric;
+  final bool denied;
+  final String value;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      key: ValueKey('stat-${metric.name}'),
+      leading: Text(metric.emoji, style: const TextStyle(fontSize: 28)),
+      title: Text(metric.label),
+      subtitle: denied
+          ? const Text('Not allowed in your health app')
+          : subtitle == null
+          ? null
+          : Text(subtitle!),
+      trailing: Text(
+        denied ? 'No access' : value,
+        style: Theme.of(context).textTheme.titleMedium
+            ?.copyWith(color: denied ? AppColors.inkSoft : null),
+      ),
+    );
+  }
+}
+
+/// Connect / sync status for the health source, with the action that fits
+/// the current state.
+class _ConnectCard extends StatelessWidget {
+  const _ConnectCard({
+    required this.stats,
+    required this.busy,
+    required this.failed,
+    required this.onConnect,
+    required this.onInstall,
+  });
+
+  final HealthStatsRepository stats;
+  final bool busy;
+  final bool failed;
+  final VoidCallback onConnect;
+  final VoidCallback onInstall;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = stats.sourceName;
+    final theme = Theme.of(context).textTheme;
+    final denied = stats.deniedMetrics;
+    final deniedNames = [
+      for (final m in _shown)
+        if (denied.contains(m)) m.label,
+    ];
+
+    final String title;
+    final String message;
+    final IconData icon;
+    final Color iconColor;
+    String? installLabel;
+
+    if (failed) {
+      title = "Couldn't reach $source";
+      message = 'Something went wrong. Try again.';
+      icon = Icons.error_outline;
+      iconColor = AppColors.red;
+    } else if (stats.isConnected) {
+      title = '$source connected';
+      final at = stats.lastSyncedAt;
+      final synced = at == null
+          ? 'Synced'
+          : 'Synced at ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(at))}';
+      message = deniedNames.isEmpty
+          ? synced
+          : '$synced. ${deniedNames.join(', ')} not allowed: turn '
+                '${deniedNames.length == 1 ? 'it' : 'them'} on in $source, '
+                'then sync again.';
+      icon = deniedNames.isEmpty ? Icons.check_circle : Icons.info_outline;
+      iconColor = deniedNames.isEmpty ? AppColors.primary : AppColors.orange;
+    } else {
+      switch (stats.availability) {
+        case HealthAvailability.notInstalled:
+          title = '$source is not installed';
+          message = 'Install $source, then come back to sync your stats.';
+          installLabel = 'Install $source';
+        case HealthAvailability.updateRequired:
+          title = '$source needs an update';
+          message = 'Update $source, then come back to sync your stats.';
+          installLabel = 'Update $source';
+        case HealthAvailability.unsupported:
+          title = '$source is not available';
+          message = "This device can't sync health stats. Showing demo data.";
+        case HealthAvailability.available:
+          title = 'No access to $source';
+          message = 'Allow reading your stats in $source, then try again.';
+        case null:
+          title = 'Showing demo data';
+          message = 'Connect $source to sync your real stats.';
+      }
+      icon = stats.availability == null ? Icons.sync : Icons.warning_amber;
+      iconColor = stats.availability == null
+          ? AppColors.blue
+          : AppColors.orange;
+    }
+
+    final unsupported = stats.availability == HealthAvailability.unsupported;
+    return ChunkyCard(
+      key: const ValueKey('connect-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: iconColor),
+              const SizedBox(width: 12),
+              Expanded(child: Text(title, style: theme.titleMedium)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: theme.bodyMedium?.copyWith(color: AppColors.inkSoft),
+          ),
+          if (!unsupported) ...[
+            const SizedBox(height: 12),
+            if (installLabel != null) ...[
+              ChunkyButton(
+                key: const ValueKey('install-button'),
+                label: installLabel,
+                icon: Icons.download,
+                onPressed: busy ? null : onInstall,
+              ),
+              const SizedBox(height: 8),
+            ],
+            installLabel != null
+                ? ChunkyButton.secondary(
+                    key: const ValueKey('connect-button'),
+                    label: 'Try again',
+                    onPressed: busy ? null : onConnect,
+                  )
+                : ChunkyButton(
+                    key: const ValueKey('connect-button'),
+                    label: busy
+                        ? 'Syncing…'
+                        : stats.isConnected
+                        ? 'Sync now'
+                        : 'Connect $source',
+                    icon: stats.isConnected ? Icons.sync : Icons.favorite,
+                    onPressed: busy ? null : onConnect,
+                  ),
+          ],
+        ],
       ),
     );
   }

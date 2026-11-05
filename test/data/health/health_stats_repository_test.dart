@@ -233,5 +233,62 @@ void main() {
         expect(board.length, (await friends.friends()).length + 1);
       },
     );
+
+    test('xp leaderboard ranks the health-backed user among friends', () async {
+      final source = FakeHealthSource(stats: [day(9, steps: 5000, workout: 10)]);
+      final r = repo(source);
+      await r.connect();
+      final board = await r.xpLeaderboard(weekOf: today);
+      expect(board.length, (await friends.friends()).length + 1);
+      // 50 XP for steps + 20 XP for workout minutes.
+      expect(board.firstWhere((e) => e.user.id == me).value, 70);
+    });
+
+    test('reports the source name, availability and sync time', () async {
+      final r = HealthStatsRepository(
+        source: FakeHealthSource(displayName: 'Apple Health'),
+        fallback: mock,
+        friends: friends,
+        clock: () => today,
+      );
+      expect(r.sourceName, 'Apple Health');
+      expect(r.availability, isNull);
+      expect(r.lastSyncedAt, isNull);
+      await r.connect();
+      expect(r.availability, HealthAvailability.available);
+      expect(r.lastSyncedAt, today);
+    });
+
+    test('lists denied metrics, but not unknown (iOS) ones', () async {
+      final r = repo(
+        FakeHealthSource(
+          permissionOutcome: {
+            StatMetric.steps: HealthPermissionStatus.granted,
+            StatMetric.sleep: HealthPermissionStatus.denied,
+            StatMetric.workout: HealthPermissionStatus.unknown,
+            StatMetric.calories: HealthPermissionStatus.denied,
+          },
+        ),
+      );
+      expect(r.deniedMetrics, isEmpty);
+      await r.connect();
+      expect(r.deniedMetrics, {StatMetric.sleep, StatMetric.calories});
+    });
+
+    test('a failed re-sync drops back to the fallback', () async {
+      final source = FakeHealthSource(stats: [day(9, steps: 1)]);
+      final r = repo(source);
+      expect(await r.connect(), isTrue);
+      source.availabilityResult = HealthAvailability.notInstalled;
+      expect(await r.connect(), isFalse);
+      expect(r.isConnected, isFalse);
+      expect(r.availability, HealthAvailability.notInstalled);
+    });
+
+    test('openInstallPage goes to the source', () async {
+      final source = FakeHealthSource();
+      await repo(source).openInstallPage();
+      expect(source.openInstallPageCalls, 1);
+    });
   });
 }
