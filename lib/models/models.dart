@@ -8,3 +8,4 @@ export 'leaderboard_entry.dart';
 export 'stat_metric.dart';
 export 'user_profile.dart';
 export 'weekly_summary.dart';
+export 'xp.dart';

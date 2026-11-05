@@ -20,4 +20,7 @@ abstract interface class StatsRepository {
     StatMetric metric, {
     DateTime? weekOf,
   });
+
+  /// Same people as [leaderboard], ranked by the week's XP (see [weeklyXp]).
+  Future<List<LeaderboardEntry>> xpLeaderboard({DateTime? weekOf});
 }
