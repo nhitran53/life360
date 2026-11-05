@@ -3,6 +3,15 @@ import 'dart:convert';
 import '../../models/models.dart';
 import 'health_source.dart';
 
+/// Thrown when the Takeout daily-totals file cannot be read. The message is
+/// fixed: it never carries the path, the file contents or health values.
+class TakeoutLoadException implements Exception {
+  const TakeoutLoadException();
+
+  @override
+  String toString() => 'Could not read the Takeout daily-totals file';
+}
+
 /// Dev-only [HealthSource] that reads a small daily-totals JSON produced
 /// outside the repo from a Google Takeout export:
 /// `{"days": [{"date": "yyyy-mm-dd", "steps": 0, "sleepMinutes": 0,
@@ -47,10 +56,17 @@ class TakeoutHealthSource implements HealthSource {
   }) async {
     final start = dateOnly(from);
     final end = dateOnly(to);
+    final String raw;
+    try {
+      raw = await _load();
+    } on Object {
+      // Drop the original error: it could carry a path.
+      throw const TakeoutLoadException();
+    }
     final Object? decoded;
     try {
-      decoded = jsonDecode(await _load());
-    } on Object {
+      decoded = jsonDecode(raw);
+    } on FormatException {
       return [];
     }
     final rows = decoded is Map ? decoded['days'] : null;
@@ -65,8 +81,10 @@ class TakeoutHealthSource implements HealthSource {
             0) {
           days.add(s);
         }
-      } on Object {
+      } on FormatException {
         continue; // skip malformed rows
+      } on TypeError {
+        continue;
       }
     }
     return days..sort((a, b) => a.date.compareTo(b.date));

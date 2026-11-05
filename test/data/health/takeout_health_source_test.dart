@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/data/health/takeout_health_source.dart';
 
@@ -37,6 +39,37 @@ void main() {
       '{"days":[1,{"date":"x"},{"date":"2026-01-02","steps":5}]}',
     ).fetchDailyStats('me', from: from, to: to);
     expect(out.length, 1);
+  });
+
+  test('a failing load surfaces a sanitized TakeoutLoadException', () async {
+    final s = TakeoutHealthSource(
+      load: () async => throw const FileSystemException('x', '/secret/path'),
+    );
+    await expectLater(
+      s.fetchDailyStats('me', from: from, to: to),
+      throwsA(
+        isA<TakeoutLoadException>().having(
+          (e) => e.toString(),
+          'message',
+          allOf(isNot(contains('secret')), contains('Could not read')),
+        ),
+      ),
+    );
+  });
+
+  test('malformed json yields no days without throwing', () async {
+    for (final bad in [
+      '{"days":',
+      '',
+      '{"days":"x"}',
+      '{"days":[null,[],"a"]}',
+    ]) {
+      expect(
+        await source(bad).fetchDailyStats('me', from: from, to: to),
+        isEmpty,
+        reason: 'input: $bad',
+      );
+    }
   });
 
   test('grants all readable metrics', () async {
