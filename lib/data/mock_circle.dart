@@ -24,6 +24,7 @@ class CircleMember {
     required this.nudgeHint,
     required this.objectPronoun,
     this.idle = false,
+    this.idleFor,
   });
 
   final String id;
@@ -61,6 +62,12 @@ class CircleMember {
 
   /// Hasn't moved in a while; shows a Nudge button instead of heart rate.
   final bool idle;
+
+  /// How long they've been idle, e.g. "3h" (shown as "idle 3h" on the map).
+  final String? idleFor;
+
+  /// High enough to highlight in red on the pulse map.
+  bool get highHeartRate => bpm >= 120;
 }
 
 const circleStepGoal = 10000;
@@ -101,6 +108,7 @@ const circleDad = CircleMember(
   nudgeHint: 'Dad has been idle for 3 hours · 3,105 steps today',
   objectPronoun: 'him',
   idle: true,
+  idleFor: '3h',
 );
 
 const circleBao = CircleMember(
@@ -152,5 +160,51 @@ const circleQuickNotes = [
   'Stand up, stretch and drink some water',
 ];
 
-const circleStepsToday = 38412;
-const circleStepsGoal = 50000;
+/// Your own live stats, shown as "You" in the middle of the pulse map.
+const circleYouBpm = 71;
+const circleYouSteps = 10527;
+
+// ---------------------------------------------------------------------------
+// FAMILIES — the circles you belong to (switch with the header button)
+// ---------------------------------------------------------------------------
+
+/// A family (or friend group) you share stats with.
+class CircleFamily {
+  const CircleFamily({
+    required this.id,
+    required this.name,
+    this.mapMembers = const [],
+    this.listMembers = const [],
+  });
+
+  final String id;
+  final String name;
+
+  /// Placed around "You" on the pulse map, in order (the map has 4 spots).
+  final List<CircleMember> mapMembers;
+
+  /// Shown as rows under "Together today".
+  final List<CircleMember> listMembers;
+
+  /// Everyone in the family except you.
+  List<CircleMember> get members => {...mapMembers, ...listMembers}.toList();
+
+  /// Including you.
+  int get memberCount => members.length + 1;
+
+  int get stepsToday =>
+      members.fold(circleYouSteps, (sum, member) => sum + member.steps);
+
+  /// Everyone's daily step goal added together.
+  int get stepsGoal => circleStepGoal * memberCount;
+}
+
+const circleTranFamily = CircleFamily(
+  id: 'tran',
+  name: 'Tran family',
+  mapMembers: [circleMom, circleDad, circleBao, circleLinh],
+  listMembers: circleListMembers,
+);
+
+/// The families you start with. New ones are added from the Circle header.
+const circleFamilies = [circleTranFamily];

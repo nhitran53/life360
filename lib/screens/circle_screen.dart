@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../data/mock_circle.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
+import '../widgets/family_switcher.dart';
 import 'leaderboard_screen.dart';
 import 'member_detail_screen.dart';
 import 'nudge_screen.dart';
@@ -31,6 +32,28 @@ class _CircleScreenState extends State<CircleScreen> {
   /// Changes whenever a nudge is started from elsewhere, so the Nudges tab
   /// starts fresh for the new recipient.
   Key _nudgeKey = UniqueKey();
+
+  /// Every family you belong to, plus any you create this session.
+  final List<CircleFamily> _families = [...circleFamilies];
+
+  /// The one the Circle home is showing.
+  late CircleFamily _family = _families.first;
+
+  Future<void> _switchFamily() async {
+    final next = await showFamilySwitcher(
+      context,
+      families: _families,
+      current: _family,
+    );
+    if (next == null || !mounted) return;
+
+    final isNew = !_families.contains(next);
+    setState(() {
+      if (isNew) _families.add(next);
+      _family = next;
+    });
+    if (isNew) showCircleSnack(context, 'Created ${next.name} 🎉');
+  }
 
   void _selectTab(CircleTab tab) {
     if (tab == CircleTab.ranks) {
@@ -77,7 +100,12 @@ class _CircleScreenState extends State<CircleScreen> {
             CircleTab.privacy => 2,
           },
           children: [
-            _CircleHome(onOpenMember: _openMember, onNudge: _nudge),
+            _CircleHome(
+              family: _family,
+              onSwitchFamily: _switchFamily,
+              onOpenMember: _openMember,
+              onNudge: _nudge,
+            ),
             NudgeScreen(key: _nudgeKey, initialRecipient: _nudgeRecipient),
             const PrivacyScreen(),
           ],
@@ -88,8 +116,15 @@ class _CircleScreenState extends State<CircleScreen> {
 }
 
 class _CircleHome extends StatelessWidget {
-  const _CircleHome({required this.onOpenMember, required this.onNudge});
+  const _CircleHome({
+    required this.family,
+    required this.onSwitchFamily,
+    required this.onOpenMember,
+    required this.onNudge,
+  });
 
+  final CircleFamily family;
+  final VoidCallback onSwitchFamily;
   final ValueChanged<CircleMember> onOpenMember;
   final ValueChanged<CircleMember> onNudge;
 
@@ -100,13 +135,17 @@ class _CircleHome extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _Header(),
+          _Header(familyName: family.name, onTap: onSwitchFamily),
           const SizedBox(height: 14),
-          const _PulseMap(),
+          _PulseMap(members: family.mapMembers),
           const SizedBox(height: 14),
-          const _TogetherToday(steps: circleStepsToday, goal: circleStepsGoal),
-          for (final member in circleListMembers) ...[
-            SizedBox(height: member == circleListMembers.first ? 14 : 8),
+          _TogetherToday(steps: family.stepsToday, goal: family.stepsGoal),
+          if (family.listMembers.isEmpty) ...[
+            const SizedBox(height: 14),
+            _EmptyFamily(name: family.name),
+          ],
+          for (final member in family.listMembers) ...[
+            SizedBox(height: member == family.listMembers.first ? 14 : 8),
             _MemberRow(
               member: member,
               onTap: () => onOpenMember(member),
@@ -124,47 +163,70 @@ class _CircleHome extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.familyName, required this.onTap});
+
+  final String familyName;
+
+  /// Opens the family switcher.
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: CircleColors.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: CircleColors.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SvgPicture.asset(
-                '$circleAssets/icon_users.svg',
-                width: 16,
-                height: 16,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Tran family',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: CircleColors.ink,
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Semantics(
+              button: true,
+              hint: 'Switch or create a family',
+              child: Material(
+                color: CircleColors.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                  side: const BorderSide(color: CircleColors.border),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onTap,
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          '$circleAssets/icon_users.svg',
+                          width: 16,
+                          height: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            familyName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: CircleColors.ink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SvgPicture.asset(
+                          '$circleAssets/icon_chevron_down.svg',
+                          width: 14,
+                          height: 14,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              SvgPicture.asset(
-                '$circleAssets/icon_chevron_down.svg',
-                width: 14,
-                height: 14,
-              ),
-            ],
+            ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 12),
         SizedBox(
           width: 44,
           height: 44,
@@ -197,10 +259,26 @@ class _Header extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _PulseMap extends StatelessWidget {
-  const _PulseMap();
+  const _PulseMap({required this.members});
+
+  /// Placed around "You" in order; the map has room for [_spots].length.
+  final List<CircleMember> members;
+
+  /// Where members sit, straight from the 342×248 design frame.
+  static const _spots = [
+    Offset(48, 24),
+    Offset(248, 40),
+    Offset(58, 160),
+    Offset(262, 128),
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final placed = [
+      for (var i = 0; i < members.length && i < _spots.length; i++)
+        (member: members[i], spot: _spots[i]),
+    ];
+
     return Container(
       height: 248,
       clipBehavior: Clip.antiAlias,
@@ -209,7 +287,6 @@ class _PulseMap extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
       ),
       alignment: Alignment.center,
-      // Positions come straight from the 342×248 design frame.
       child: SizedBox(
         width: 342,
         height: 248,
@@ -219,9 +296,13 @@ class _PulseMap extends StatelessWidget {
             _svgAt('ring_outer', left: 63, top: 16, size: 216),
             _svgAt('ring_middle', left: 99, top: 52, size: 144),
             _svgAt('ring_inner', left: 135, top: 88, size: 72),
-            // Soft red glow behind Bao (high heart rate).
-            _svgAt('glow_outer', left: 50, top: 154, size: 68),
-            _svgAt('glow_inner', left: 58, top: 162, size: 52),
+            // Soft red glow behind anyone with a high heart rate.
+            for (final (:member, :spot) in placed)
+              if (member.highHeartRate) ...[
+                _svgAt('glow_outer',
+                    left: spot.dx - 8, top: spot.dy - 6, size: 68),
+                _svgAt('glow_inner', left: spot.dx, top: spot.dy + 2, size: 52),
+              ],
             const Positioned(
               left: 145,
               top: 92,
@@ -229,47 +310,33 @@ class _PulseMap extends StatelessWidget {
                 initial: 'You',
                 color: CircleColors.avatarYou,
                 size: 52,
-                badge: _HeartBadge(bpm: 71),
+                badge: _HeartBadge(bpm: circleYouBpm),
               ),
             ),
-            const Positioned(
-              left: 48,
-              top: 24,
-              child: _MapMember(
-                initial: 'M',
-                color: CircleColors.avatarMom,
-                badge: _HeartBadge(bpm: 78),
+            for (final (:member, :spot) in placed)
+              Positioned(
+                left: spot.dx,
+                top: spot.dy,
+                child: _MapMember(
+                  initial: member.initial,
+                  color: member.color,
+                  ringColor: member.highHeartRate
+                      ? CircleColors.alert
+                      : member.idle
+                      ? CircleColors.idle
+                      : CircleColors.mapBackground,
+                  badge: member.idle
+                      ? _TextBadge(
+                    text: member.idleFor == null
+                        ? 'idle'
+                        : 'idle ${member.idleFor}',
+                  )
+                      : _HeartBadge(
+                    bpm: member.bpm,
+                    alert: member.highHeartRate,
+                  ),
+                ),
               ),
-            ),
-            const Positioned(
-              left: 248,
-              top: 40,
-              child: _MapMember(
-                initial: 'D',
-                color: CircleColors.avatarDad,
-                ringColor: CircleColors.idle,
-                badge: _TextBadge(text: 'idle 3h'),
-              ),
-            ),
-            const Positioned(
-              left: 58,
-              top: 160,
-              child: _MapMember(
-                initial: 'B',
-                color: CircleColors.avatarBao,
-                ringColor: CircleColors.alert,
-                badge: _HeartBadge(bpm: 132, alert: true),
-              ),
-            ),
-            const Positioned(
-              left: 262,
-              top: 128,
-              child: _MapMember(
-                initial: 'L',
-                color: CircleColors.avatarLinh,
-                badge: _HeartBadge(bpm: 70),
-              ),
-            ),
             const Positioned(left: 178, top: 213, child: _LiveChip()),
           ],
         ),
@@ -278,11 +345,11 @@ class _PulseMap extends StatelessWidget {
   }
 
   static Widget _svgAt(
-    String name, {
-    required double left,
-    required double top,
-    required double size,
-  }) {
+      String name, {
+        required double left,
+        required double top,
+        required double size,
+      }) {
     return Positioned(
       left: left,
       top: top,
@@ -515,6 +582,63 @@ class _TogetherToday extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// EMPTY FAMILY — shown for a new family with nobody in it yet
+// ---------------------------------------------------------------------------
+
+class _EmptyFamily extends StatelessWidget {
+  const _EmptyFamily({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleCard(
+      radius: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: CircleColors.mapBackground,
+              shape: BoxShape.circle,
+            ),
+            child: const CircleSvg('icon_users', size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Just you so far',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: CircleColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Invite people to $name to start comparing stats',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: CircleColors.secondary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
