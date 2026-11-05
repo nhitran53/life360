@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../data/health_source.dart';
+import '../data/health_stats_repository.dart';
+import '../data/health_sync.dart';
 import '../data/mock_circle.dart';
+import '../data/mock_friends_repository.dart';
+import '../data/mock_stats_repository.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
 import 'leaderboard_screen.dart';
@@ -34,8 +39,18 @@ class _CircleScreenState extends State<CircleScreen> {
 
   void _selectTab(CircleTab tab) {
     if (tab == CircleTab.ranks) {
+      // Your row uses real health data once connected; friends stay mock
+      // until Firestore is in.
+      final friends = MockFriendsRepository();
+      final stats = HealthStatsRepository(
+        fallback: MockStatsRepository(friends: friends),
+        friends: friends,
+        health: HealthScope.of(context),
+      );
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const LeaderboardScreen()),
+        MaterialPageRoute<void>(
+          builder: (_) => LeaderboardScreen(friends: friends, stats: stats),
+        ),
       );
       return;
     }
@@ -105,6 +120,7 @@ class _CircleHome extends StatelessWidget {
           const _PulseMap(),
           const SizedBox(height: 14),
           const _TogetherToday(steps: circleStepsToday, goal: circleStepsGoal),
+          const _YouToday(),
           for (final member in circleListMembers) ...[
             SizedBox(height: member == circleListMembers.first ? 14 : 8),
             _MemberRow(
@@ -515,6 +531,210 @@ class _TogetherToday extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// YOU TODAY — your real stats from Apple Health / Health Connect
+// ---------------------------------------------------------------------------
+
+class _YouToday extends StatelessWidget {
+  const _YouToday();
+
+  @override
+  Widget build(BuildContext context) {
+    final health = HealthScope.of(context);
+    if (health.connection == HealthConnection.unsupported) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: health.isConnected
+          ? _YouStats(health: health)
+          : _ConnectPrompt(health: health),
+    );
+  }
+}
+
+class _ConnectPrompt extends StatelessWidget {
+  const _ConnectPrompt({required this.health});
+
+  final HealthSync health;
+
+  @override
+  Widget build(BuildContext context) {
+    final install = health.connection == HealthConnection.needsInstall;
+
+    return CircleCard(
+      radius: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          const MemberAvatar(initial: 'You', color: CircleColors.avatarYou),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Bring your watch in',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: CircleColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  install
+                      ? 'Install Health Connect to sync'
+                      : 'Sync from ${health.source.name}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: CircleColors.secondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          CirclePillButton(
+            label: install ? 'Install' : 'Connect',
+            filled: true,
+            onPressed: () {
+              if (health.busy) return;
+              install ? health.installProvider() : health.connect();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _YouStats extends StatelessWidget {
+  const _YouStats({required this.health});
+
+  final HealthSync health;
+
+  @override
+  Widget build(BuildContext context) {
+    final today = health.today;
+    final sleep = today?.sleepMinutes ?? 0;
+
+    return Material(
+      color: CircleColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: CircleColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: health.refresh,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const MemberAvatar(
+                    initial: 'You',
+                    color: CircleColors.avatarYou,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'You · today',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: CircleColors.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          health.busy
+                              ? 'Syncing…'
+                              : '${health.source.name} · '
+                                  'synced ${syncedAgo(health.lastSynced)}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: CircleColors.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _YouStat(
+                    value: formatNumber(today?.steps ?? 0),
+                    label: 'steps',
+                  ),
+                  _YouStat(
+                    value: '${today?.workoutMinutes ?? 0}',
+                    label: 'active min',
+                  ),
+                  _YouStat(
+                    value: sleep == 0
+                        ? '–'
+                        : '${sleep ~/ 60}h ${sleep % 60}m',
+                    label: 'sleep',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _YouStat extends StatelessWidget {
+  const _YouStat({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: CircleColors.ink,
+            ),
+          ),
+          Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: CircleColors.secondary,
             ),
           ),
         ],

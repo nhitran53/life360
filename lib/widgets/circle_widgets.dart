@@ -353,3 +353,13 @@ void showCircleSnack(BuildContext context, String message) {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
 }
+
+/// "just now", "4 min ago", "2 h ago", "3 d ago". "never" when null.
+String syncedAgo(DateTime? then, {DateTime? now}) {
+  if (then == null) return 'never';
+  final d = (now ?? DateTime.now()).difference(then);
+  if (d.inMinutes < 1) return 'just now';
+  if (d.inHours < 1) return '${d.inMinutes} min ago';
+  if (d.inDays < 1) return '${d.inHours} h ago';
+  return '${d.inDays} d ago';
+}

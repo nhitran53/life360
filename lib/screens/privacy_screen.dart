@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/health_source.dart';
+import '../data/health_sync.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
 
@@ -55,6 +57,22 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
     );
   }
 
+  Future<void> _disconnect() async {
+    final health = HealthScope.of(context);
+    if (!health.isConnected) {
+      showCircleSnack(context, 'Nothing is connected yet');
+      return;
+    }
+    await health.disconnect();
+    if (!mounted) return;
+    showCircleSnack(
+      context,
+      health.source.name == 'Apple Health'
+          ? 'Disconnected. To remove access fully: Health app → Sharing → Apps'
+          : 'Disconnected from ${health.source.name}',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -67,11 +85,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
             subtitle: 'You decide who sees what. Change it anytime.',
           ),
           const SizedBox(height: 14),
-          _FitbitCard(
-            paused: _paused,
-            onManage: () =>
-                showCircleSnack(context, 'Managing Fitbit is coming soon 👀'),
-          ),
+          _HealthCard(paused: _paused),
           const SizedBox(height: 14),
           _Section(
             label: 'What you share',
@@ -128,10 +142,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
                   horizontalPadding: 16,
                   borderColor: CircleColors.dangerOutline,
                   textColor: CircleColors.heart,
-                  onPressed: () => showCircleSnack(
-                    context,
-                    'Disconnecting Fitbit is coming soon 👀',
-                  ),
+                  onPressed: _disconnect,
                 ),
               ),
             ],
@@ -142,14 +153,58 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
   }
 }
 
-class _FitbitCard extends StatelessWidget {
-  const _FitbitCard({required this.paused, required this.onManage});
+/// The phone's health hub (Apple Health / Health Connect): connect, sync,
+/// or install Health Connect on Android.
+class _HealthCard extends StatelessWidget {
+  const _HealthCard({required this.paused});
 
   final bool paused;
-  final VoidCallback onManage;
 
   @override
   Widget build(BuildContext context) {
+    final health = HealthScope.of(context);
+    final connected = health.isConnected;
+
+    final (String status, Color statusColor) = switch (health.connection) {
+      _ when paused => ('Paused · sharing resumes in 24 h', CircleColors.secondary),
+      _ when health.busy => ('Syncing…', CircleColors.secondary),
+      HealthConnection.connected when health.syncFailed =>
+        ("Couldn't sync · tap Sync to retry", CircleColors.heart),
+      HealthConnection.connected => (
+          'Connected · last sync ${syncedAgo(health.lastSynced)}',
+          CircleColors.okTextDark,
+        ),
+      HealthConnection.notConnected =>
+        ('Not connected · your watch syncs through it', CircleColors.secondary),
+      HealthConnection.needsInstall =>
+        ('Install Health Connect to sync your watch', CircleColors.secondary),
+      HealthConnection.unsupported =>
+        ('Open Friend 360 on your phone to sync', CircleColors.secondary),
+    };
+
+    final String? action = switch (health.connection) {
+      HealthConnection.connected => 'Sync',
+      HealthConnection.notConnected => 'Connect',
+      HealthConnection.needsInstall => 'Install',
+      HealthConnection.unsupported => null,
+    };
+
+    Future<void> onAction() async {
+      switch (health.connection) {
+        case HealthConnection.connected:
+          await health.refresh();
+        case HealthConnection.notConnected:
+          final ok = await health.connect();
+          if (!ok && context.mounted) {
+            showCircleSnack(context, 'No access yet. You can allow it anytime 🙂');
+          }
+        case HealthConnection.needsInstall:
+          await health.installProvider();
+        case HealthConnection.unsupported:
+          break;
+      }
+    }
+
     return CircleCard(
       radius: 18,
       padding: const EdgeInsets.all(14),
@@ -160,7 +215,9 @@ class _FitbitCard extends StatelessWidget {
             height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: CircleColors.okBackground,
+              color: connected
+                  ? CircleColors.okBackground
+                  : CircleColors.divider,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const CircleSvg('icon_link', size: 22),
@@ -170,9 +227,9 @@ class _FitbitCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Google Fitbit',
-                  style: TextStyle(
+                Text(
+                  health.source.name,
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                     color: CircleColors.ink,
@@ -180,22 +237,24 @@ class _FitbitCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  paused
-                      ? 'Paused · sharing resumes in 24 h'
-                      : 'Connected · last sync 2 min ago',
+                  status,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: paused
-                        ? CircleColors.secondary
-                        : CircleColors.okTextDark,
+                    color: statusColor,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          CirclePillButton(label: 'Manage', onPressed: onManage),
+          if (action != null) ...[
+            const SizedBox(width: 12),
+            CirclePillButton(
+              label: action,
+              filled: !connected,
+              onPressed: health.busy ? () {} : onAction,
+            ),
+          ],
         ],
       ),
     );

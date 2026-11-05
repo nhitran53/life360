@@ -24,6 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Friend 360 reads your steps, active energy, workouts and sleep so you can see your progress and share the stats you choose with friends.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Friend 360 doesn't write to Apple Health. This is required by the health plugin.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

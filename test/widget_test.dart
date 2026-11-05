@@ -6,7 +6,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:life360/data/health_source.dart';
+import 'package:life360/data/health_sync.dart';
+import 'package:life360/data/mock_health_source.dart';
 import 'package:life360/hub_screen.dart';
+import 'package:life360/models/models.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
 import 'package:life360/screens/leaderboard_screen.dart';
@@ -18,6 +22,14 @@ void useTallPhone(WidgetTester tester) {
   tester.view.devicePixelRatio = 3.0;
   addTearDown(tester.view.reset);
 }
+
+/// A Circle screen with a fake health hub above it.
+Widget circleWithHealth(HealthSync sync,
+        {CircleTab initialTab = CircleTab.circle}) =>
+    HealthScope(
+      sync: sync,
+      child: MaterialApp(home: CircleScreen(initialTab: initialTab)),
+    );
 
 void main() {
   testWidgets('Home screen shows logo, name, tagline and button',
@@ -207,5 +219,107 @@ void main() {
         expect(find.text('My Stats'), findsOneWidget);
         expect(find.text("Friends' Stats"), findsOneWidget);
         expect(find.text('Leaderboard'), findsOneWidget);
+      });
+
+  testWidgets('Circle home invites you to connect, then shows your stats',
+          (WidgetTester tester) async {
+        useTallPhone(tester);
+        final today = dateOnly(DateTime.now());
+        final sync = HealthSync(
+          MockHealthSource(days: {
+            today: DailyStats(
+              userId: 'u_me',
+              date: today,
+              steps: 6120,
+              workoutMinutes: 34,
+              sleepMinutes: 7 * 60 + 5,
+            ),
+          }),
+          userId: 'u_me',
+        );
+        addTearDown(sync.dispose);
+        await tester.runAsync(sync.start);
+
+        await tester.pumpWidget(circleWithHealth(sync));
+        expect(find.text('Bring your watch in'), findsOneWidget);
+        expect(find.text('Sync from Apple Health'), findsOneWidget);
+
+        await tester.ensureVisible(find.text('Connect'));
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Connect'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+
+        expect(find.text('You · today'), findsOneWidget);
+        expect(find.text('6,120'), findsOneWidget);
+        expect(find.text('34'), findsOneWidget);
+        expect(find.text('7h 5m'), findsOneWidget);
+        expect(find.text('Apple Health · synced just now'), findsOneWidget);
+      });
+
+  testWidgets('Circle home hides the health card without a health hub',
+          (WidgetTester tester) async {
+        useTallPhone(tester);
+        await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
+        await tester.pump();
+
+        expect(find.text('Bring your watch in'), findsNothing);
+        expect(find.text('You · today'), findsNothing);
+      });
+
+  testWidgets('Privacy card connects and disconnects the health hub',
+          (WidgetTester tester) async {
+        useTallPhone(tester);
+        final sync = HealthSync(
+          MockHealthSource(name: 'Health Connect'),
+          userId: 'u_me',
+        );
+        addTearDown(sync.dispose);
+        await tester.runAsync(sync.start);
+
+        await tester.pumpWidget(
+            circleWithHealth(sync, initialTab: CircleTab.privacy));
+        expect(find.text('Health Connect'), findsOneWidget);
+        expect(find.text('Not connected · your watch syncs through it'),
+            findsOneWidget);
+
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Connect'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+        expect(find.text('Connected · last sync just now'), findsOneWidget);
+        expect(find.text('Sync'), findsOneWidget);
+
+        await tester.ensureVisible(find.text('Disconnect'));
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Disconnect'));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pump();
+        expect(sync.isConnected, isFalse);
+        expect(find.text('Disconnected from Health Connect'), findsOneWidget);
+      });
+
+  testWidgets('Privacy card offers to install Health Connect',
+          (WidgetTester tester) async {
+        useTallPhone(tester);
+        final source = MockHealthSource(
+          name: 'Health Connect',
+          initial: HealthConnection.needsInstall,
+        );
+        final sync = HealthSync(source, userId: 'u_me');
+        addTearDown(sync.dispose);
+        await tester.runAsync(sync.start);
+
+        await tester.pumpWidget(
+            circleWithHealth(sync, initialTab: CircleTab.privacy));
+        expect(find.text('Install Health Connect to sync your watch'),
+            findsOneWidget);
+
+        await tester.tap(find.text('Install'));
+        await tester.pump();
+        expect(source.installCalls, 1);
       });
 }

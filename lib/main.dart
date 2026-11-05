@@ -2,6 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'data/device_health_source.dart';
+import 'data/health_source.dart';
+import 'data/health_sync.dart';
+import 'data/mock_data.dart';
 import 'models/stat_metric.dart';
 import 'screens/circle_screen.dart';
 import 'theme/app_colors.dart';
@@ -11,16 +15,52 @@ import 'widgets/chunky.dart';
 
 void main() => runApp(const Friend360App());
 
-class Friend360App extends StatelessWidget {
-  const Friend360App({super.key});
+class Friend360App extends StatefulWidget {
+  const Friend360App({super.key, this.healthSource});
+
+  /// Defaults to the phone's health hub (Apple Health / Health Connect).
+  final HealthSource? healthSource;
+
+  @override
+  State<Friend360App> createState() => _Friend360AppState();
+}
+
+class _Friend360AppState extends State<Friend360App> {
+  // TODO: use the signed-in user's id once Firebase Auth is in.
+  late final HealthSync _health = HealthSync(
+    widget.healthSource ?? DeviceHealthSource(),
+    userId: mockMe.id,
+  );
+
+  /// Re-checks access when the user comes back from the Health app or from
+  /// installing Health Connect, and pulls in anything new from the watch.
+  late final AppLifecycleListener _lifecycle =
+      AppLifecycleListener(onResume: _health.start);
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle; // start listening
+    _health.start();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    _health.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Friend 360',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      home: const HomeScreen(),
+    return HealthScope(
+      sync: _health,
+      child: MaterialApp(
+        title: 'Friend 360',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        home: const HomeScreen(),
+      ),
     );
   }
 }
