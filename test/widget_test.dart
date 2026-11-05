@@ -1,8 +1,7 @@
 // Widget tests for the Friend 360 home screen.
 //
-// Note: the home screen has animations that loop forever (background,
-// floating emojis, button pulse), so we use tester.pump(duration) instead of
-// tester.pumpAndSettle() — pumpAndSettle would wait forever and time out.
+// The home screen intro plays once, but we still pump fixed durations so the
+// tests don't depend on exactly how long it runs.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,17 +11,18 @@ import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
 
 void main() {
-  testWidgets('Home screen shows title, tagline, and button',
+  testWidgets('Home screen shows logo, name, tagline and button',
           (WidgetTester tester) async {
         await tester.pumpWidget(const Friend360App());
 
-        // Let the intro animations (title bounce, fade-ins) finish.
+        // Let the intro animation (ring sweep, "360" pop) finish.
         await tester.pump(const Duration(seconds: 2));
 
-        expect(find.text('Friend'), findsOneWidget);
+        expect(find.text('Friend 360'), findsOneWidget);
         expect(find.text('360'), findsOneWidget);
-        expect(find.text('Sleep. Sweat. Compete. 🏆'), findsOneWidget);
-        expect(find.text('ENTER THE ARENA 🚀'), findsOneWidget);
+        expect(find.bySemanticsLabel('Friend 360 logo'), findsOneWidget);
+        expect(find.textContaining('See who wins the week.'), findsOneWidget);
+        expect(find.text("Let's go"), findsOneWidget);
       });
 
   testWidgets('Tapping the button goes to the circle home',
@@ -34,7 +34,7 @@ void main() {
         expect(find.text('Together today'), findsNothing);
 
         // Tap the button, then let the transition play.
-        await tester.tap(find.text('ENTER THE ARENA 🚀'));
+        await tester.tap(find.text("Let's go"));
         await tester.pump(); // start the navigation
         await tester.pump(const Duration(seconds: 2));
 
@@ -87,5 +87,15 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
 
         expect(find.text('Coming soon 👀'), findsOneWidget);
+      });
+
+  testWidgets('Hub shows all three destinations',
+          (WidgetTester tester) async {
+        await tester.pumpWidget(const MaterialApp(home: HubScreen()));
+        await tester.pump();
+
+        expect(find.text('My Stats'), findsOneWidget);
+        expect(find.text("Friends' Stats"), findsOneWidget);
+        expect(find.text('Leaderboard'), findsOneWidget);
       });
 }
