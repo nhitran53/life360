@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../app_services.dart';
 import '../data/mock_circle.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
 import 'leaderboard_screen.dart';
 import 'member_detail_screen.dart';
+import 'my_stats_screen.dart';
 import 'nudge_screen.dart';
 import 'privacy_screen.dart';
 
@@ -15,9 +17,16 @@ import 'privacy_screen.dart';
 // ---------------------------------------------------------------------------
 
 class CircleScreen extends StatefulWidget {
-  const CircleScreen({super.key, this.initialTab = CircleTab.circle});
+  const CircleScreen({
+    super.key,
+    this.initialTab = CircleTab.circle,
+    this.services,
+  });
 
   final CircleTab initialTab;
+
+  /// Defaults to [AppServices.defaults] when My Stats is opened.
+  final AppServices? services;
 
   @override
   State<CircleScreen> createState() => _CircleScreenState();
@@ -40,6 +49,16 @@ class _CircleScreenState extends State<CircleScreen> {
       return;
     }
     setState(() => _tab = tab);
+  }
+
+  void _openMyStats() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MyStatsScreen(
+          services: widget.services ?? AppServices.defaults(),
+        ),
+      ),
+    );
   }
 
   void _nudge(CircleMember member) {
@@ -77,7 +96,11 @@ class _CircleScreenState extends State<CircleScreen> {
             CircleTab.privacy => 2,
           },
           children: [
-            _CircleHome(onOpenMember: _openMember, onNudge: _nudge),
+            _CircleHome(
+              onOpenMember: _openMember,
+              onNudge: _nudge,
+              onOpenMyStats: _openMyStats,
+            ),
             NudgeScreen(key: _nudgeKey, initialRecipient: _nudgeRecipient),
             const PrivacyScreen(),
           ],
@@ -88,8 +111,13 @@ class _CircleScreenState extends State<CircleScreen> {
 }
 
 class _CircleHome extends StatelessWidget {
-  const _CircleHome({required this.onOpenMember, required this.onNudge});
+  const _CircleHome({
+    required this.onOpenMember,
+    required this.onNudge,
+    required this.onOpenMyStats,
+  });
 
+  final VoidCallback onOpenMyStats;
   final ValueChanged<CircleMember> onOpenMember;
   final ValueChanged<CircleMember> onNudge;
 
@@ -105,6 +133,8 @@ class _CircleHome extends StatelessWidget {
           const _PulseMap(),
           const SizedBox(height: 14),
           const _TogetherToday(steps: circleStepsToday, goal: circleStepsGoal),
+          const SizedBox(height: 14),
+          _MyStatsLink(onTap: onOpenMyStats),
           for (final member in circleListMembers) ...[
             SizedBox(height: member == circleListMembers.first ? 14 : 8),
             _MemberRow(
@@ -122,6 +152,47 @@ class _CircleHome extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // HEADER — circle switcher + notifications
 // ---------------------------------------------------------------------------
+
+class _MyStatsLink extends StatelessWidget {
+  const _MyStatsLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: CircleColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: CircleColors.border),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.sync_rounded, size: 20, color: CircleColors.ink),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'My stats and health sync',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: CircleColors.ink,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: CircleColors.muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _Header extends StatelessWidget {
   const _Header();

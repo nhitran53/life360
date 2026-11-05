@@ -10,6 +10,7 @@ import 'package:life360/hub_screen.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
 import 'package:life360/screens/leaderboard_screen.dart';
+import 'package:life360/screens/my_stats_screen.dart';
 import 'package:life360/widgets/circle_widgets.dart';
 
 /// A tall phone so whole Circle screens fit without scrolling.
@@ -67,6 +68,20 @@ void main() {
         expect(find.text('Bao'), findsOneWidget);
         expect(find.text('78 bpm'), findsOneWidget);
         expect(find.text('Live · synced 1 min ago'), findsOneWidget);
+      });
+
+  testWidgets('Circle home links to My Stats with the connect button',
+          (WidgetTester tester) async {
+        useTallPhone(tester);
+
+        await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
+        await tester.pump();
+        await tester.tap(find.text('My stats and health sync'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+
+        expect(find.byType(MyStatsScreen), findsOneWidget);
+        expect(find.byKey(const ValueKey('connect-button')), findsOneWidget);
       });
 
   testWidgets('Nudging Dad opens the nudge tab and sends',
