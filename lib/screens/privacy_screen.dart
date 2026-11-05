@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/circle_colors.dart';
+import 'privacy_policy_screen.dart';
 import '../widgets/circle_widgets.dart';
 
 // ---------------------------------------------------------------------------
@@ -135,6 +136,18 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          CirclePillButton(
+            label: 'Privacy policy',
+            height: 48,
+            fontSize: 14,
+            horizontalPadding: 16,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PrivacyPolicyScreen(),
+              ),
+            ),
           ),
         ],
       ),
