@@ -5,6 +5,7 @@ import 'package:life360/data/mock_friends_repository.dart';
 import 'package:life360/data/mock_stats_repository.dart';
 import 'package:life360/models/models.dart';
 import 'package:life360/screens/leaderboard_screen.dart';
+import 'package:life360/utils/format.dart';
 import 'package:life360/theme/app_theme.dart';
 
 void main() {
