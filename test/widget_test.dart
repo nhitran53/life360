@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:life360/data/family_store.dart';
 import 'package:life360/hub_screen.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
@@ -169,7 +170,8 @@ void main() {
               (WidgetTester tester) async {
                 useTallPhone(tester);
 
-                await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
+                await tester.pumpWidget(
+                    MaterialApp(home: CircleScreen(familyStore: FamilyStore())));
                 await tester.pump();
 
                 // Open the switcher from the header.
@@ -214,7 +216,8 @@ void main() {
               (WidgetTester tester) async {
                 useTallPhone(tester);
 
-                await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
+                await tester.pumpWidget(
+                    MaterialApp(home: CircleScreen(familyStore: FamilyStore())));
                 await tester.pump();
 
                 await tester.tap(find.text('Tran family'));
@@ -240,6 +243,49 @@ void main() {
                 await tester.pumpAndSettle();
                 expect(find.text('Tran family'), findsOneWidget);
                 expect(find.text('Mom'), findsOneWidget);
+          });
+
+      testWidgets('Ranks opens the leaderboard for the family you are viewing',
+              (WidgetTester tester) async {
+                useTallPhone(tester);
+
+                await tester.pumpWidget(
+                    MaterialApp(home: CircleScreen(familyStore: FamilyStore())));
+                await tester.pump();
+
+                // Tran family first: family members are on the board.
+                await tester.tap(find.text('Ranks'));
+                await tester.pumpAndSettle();
+                expect(find.byType(LeaderboardScreen), findsOneWidget);
+                expect(find.text('Tran family'), findsOneWidget);
+                expect(find.text('Alex'), findsNothing);
+
+                // Back to the Circle, create a new family, then check its board.
+                await tester.pageBack();
+                await tester.pumpAndSettle();
+                await tester.tap(find.text('Tran family'));
+                await tester.pumpAndSettle();
+                await tester.tap(find.text('Create a new family'));
+                await tester.pumpAndSettle();
+                await tester.enterText(
+                      find.descendant(
+                          of: find.byType(Dialog), matching: find.byType(TextField)),
+                      'Roommates',
+                );
+                await tester.tap(find.text('Create'));
+                await tester.pumpAndSettle();
+
+                await tester.tap(find.text('Ranks'));
+                await tester.pumpAndSettle();
+                expect(find.textContaining("It's just you in Roommates"),
+                    findsOneWidget);
+
+                // The new family is in the leaderboard's picker too.
+                await tester.tap(find.text('Roommates'));
+                await tester.pumpAndSettle();
+                expect(find.text('Whose leaderboard?'), findsOneWidget);
+                expect(find.text('Tran family'), findsOneWidget);
+                expect(find.text('All friends'), findsOneWidget);
           });
 
       testWidgets("Friends' Stats hub card opens the coming soon page",

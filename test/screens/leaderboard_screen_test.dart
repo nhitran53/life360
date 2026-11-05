@@ -28,7 +28,10 @@ void main() {
         FamilyStore? families,
         CircleFamily? initialFamily,
       }) async {
-    tester.view.physicalSize = const Size(1170, 2532);
+    // A tall phone so the whole board (family picker, podium and every row)
+    // is on screen. Rows below the fold aren't built, so tests that check
+    // every row would miss them on a shorter screen.
+    tester.view.physicalSize = const Size(1170, 3000);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(
