@@ -48,11 +48,19 @@ class HealthPermissionResult {
 ///
 /// Implementations return daily totals only and never log health values.
 abstract interface class HealthSource {
+  /// What to call this source in the UI: "Apple Health" or "Health Connect".
+  String get displayName;
+
   /// Metrics this source can read. Screen time is not one of them: iOS does
   /// not expose it and Android needs a separate usage-access permission.
   Set<StatMetric> get readableMetrics;
 
   Future<HealthAvailability> availability();
+
+  /// Sends the user to the store to install or update the health app. Only
+  /// meaningful for [HealthAvailability.notInstalled] and
+  /// [HealthAvailability.updateRequired]; otherwise does nothing.
+  Future<void> openInstallPage();
 
   /// Asks the user for read access to [readableMetrics] (the minimum set
   /// needed) and reports the outcome per metric.

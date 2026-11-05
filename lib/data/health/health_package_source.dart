@@ -57,6 +57,12 @@ class HealthPackageSource implements HealthSource {
   }
 
   @override
+  String get displayName => Platform.isIOS ? 'Apple Health' : 'Health Connect';
+
+  @override
+  Future<void> openInstallPage() => _health.installHealthConnect();
+
+  @override
   Future<HealthAvailability> availability() async {
     if (Platform.isIOS) return HealthAvailability.available;
     if (!Platform.isAndroid) return HealthAvailability.unsupported;
@@ -72,10 +78,15 @@ class HealthPackageSource implements HealthSource {
   Future<HealthPermissionResult> requestPermissions() async {
     await _ensureConfigured();
     final types = [for (final m in readableMetrics) ..._typesFor(m)];
-    await _health.requestAuthorization(
-      types,
-      permissions: List.filled(types.length, HealthDataAccess.READ),
-    );
+    try {
+      await _health.requestAuthorization(
+        types,
+        permissions: List.filled(types.length, HealthDataAccess.READ),
+      );
+    } catch (_) {
+      // The request can fail (e.g. the permission screen cannot open). The
+      // per-metric check below still reports what was actually granted.
+    }
     return _currentPermissions();
   }
 

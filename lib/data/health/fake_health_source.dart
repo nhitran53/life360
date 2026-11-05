@@ -4,6 +4,7 @@ import 'health_source.dart';
 /// Scripted [HealthSource] for tests and mock mode.
 class FakeHealthSource implements HealthSource {
   FakeHealthSource({
+    this.displayName = 'Health Connect',
     this.availabilityResult = HealthAvailability.available,
     Map<StatMetric, HealthPermissionStatus>? permissionOutcome,
     Iterable<DailyStats> stats = const [],
@@ -19,6 +20,9 @@ class FakeHealthSource implements HealthSource {
     StatMetric.calories,
   };
 
+  @override
+  final String displayName;
+
   HealthAvailability availabilityResult;
 
   /// What [requestPermissions] reports and what [fetchDailyStats] honours.
@@ -29,12 +33,16 @@ class FakeHealthSource implements HealthSource {
   /// How many times each method was called, for assertions.
   int requestPermissionsCalls = 0;
   int fetchCalls = 0;
+  int openInstallPageCalls = 0;
 
   @override
   Set<StatMetric> get readableMetrics => _fakeMetrics;
 
   @override
   Future<HealthAvailability> availability() async => availabilityResult;
+
+  @override
+  Future<void> openInstallPage() async => openInstallPageCalls++;
 
   @override
   Future<HealthPermissionResult> requestPermissions() async {

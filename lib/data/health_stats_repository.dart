@@ -14,27 +14,60 @@ class HealthStatsRepository implements StatsRepository {
     required this._source,
     required this._fallback,
     required this._friends,
-  });
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now;
 
   final HealthSource _source;
   final StatsRepository _fallback;
   final FriendsRepository _friends;
+  final DateTime Function() _clock;
 
   bool _connected = false;
+  HealthAvailability? _availability;
+  HealthPermissionResult? _permissions;
+  DateTime? _lastSyncedAt;
+
+  /// "Apple Health" or "Health Connect", for the UI.
+  String get sourceName => _source.displayName;
 
   /// Whether the current user's stats now come from the health platform.
   bool get isConnected => _connected;
 
+  /// Result of the last [connect], or null before the first attempt.
+  HealthAvailability? get availability => _availability;
+
+  /// When the last successful [connect] finished, or null.
+  DateTime? get lastSyncedAt => _lastSyncedAt;
+
+  /// Metrics the user turned down in the last [connect]. Their values are
+  /// unknown, not 0, so the UI must not show them as numbers. Empty before
+  /// connecting; on iOS reads are never reported as denied.
+  Set<StatMetric> get deniedMetrics {
+    final permissions = _permissions;
+    if (permissions == null) return const {};
+    return _source.readableMetrics.difference(permissions.readable);
+  }
+
   /// Checks availability and asks for read access. Returns true when at least
   /// one metric is readable, after which the current user's stats come from
   /// health. Otherwise the fallback keeps serving them.
+  ///
+  /// Also the manual re-sync: it re-checks permissions, which the user may
+  /// have changed in the system settings, and stamps [lastSyncedAt].
   Future<bool> connect() async {
-    if (await _source.availability() != HealthAvailability.available) {
+    _availability = await _source.availability();
+    if (_availability != HealthAvailability.available) {
+      _permissions = null;
       return _connected = false;
     }
-    final permissions = await _source.requestPermissions();
-    return _connected = permissions.anyReadable;
+    _permissions = await _source.requestPermissions();
+    _connected = _permissions!.anyReadable;
+    if (_connected) _lastSyncedAt = _clock();
+    return _connected;
   }
+
+  /// Sends the user to the store to install or update the health app.
+  Future<void> openInstallPage() => _source.openInstallPage();
 
   Future<bool> _usesHealth(String userId) async =>
       _connected && userId == (await _friends.currentUser()).id;
@@ -73,11 +106,17 @@ class HealthStatsRepository implements StatsRepository {
   Future<List<LeaderboardEntry>> leaderboard(
     StatMetric metric, {
     DateTime? weekOf,
-  }) async {
+  }) async => rankLeaderboard(metric, await _summaries(weekOf));
+
+  @override
+  Future<List<LeaderboardEntry>> xpLeaderboard({DateTime? weekOf}) async =>
+      rankLeaderboardByXp(await _summaries(weekOf));
+
+  /// Weekly summaries for the current user and their accepted friends.
+  Future<Map<UserProfile, WeeklySummary>> _summaries(DateTime? weekOf) async {
     final people = [await _friends.currentUser(), ...await _friends.friends()];
-    final summaries = {
+    return {
       for (final p in people) p: await weeklySummary(p.id, weekOf: weekOf),
     };
-    return rankLeaderboard(metric, summaries);
   }
 }
