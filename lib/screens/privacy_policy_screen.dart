@@ -9,8 +9,8 @@ const privacyPolicyRoute = '/privacy-policy';
 const privacyPolicySections = <(String, String)>[
   (
     'What we read',
-    'With your permission, Friend 360 reads these from Apple Health or '
-        'Health Connect: steps, sleep, workouts and active calories. It asks '
+    'With your permission, Friend 360 reads these from Apple Health (iPhone) '
+        'or Health Connect (Android): steps, sleep, workouts and active calories. It asks '
         'only for these four. It never writes to Apple Health or Health '
         'Connect.',
   ),
@@ -20,7 +20,10 @@ const privacyPolicySections = <(String, String)>[
         'no server, and it does not send your health data anywhere. It is '
         'used only to draw your stats and your place on the weekly '
         'leaderboard.\n\nThe friends and circles you see in the app are '
-        'sample data for a demo. They are not real people.',
+        'sample data for a demo. They are not real people. The Fitbit '
+        'connection status and the sharing switches on the Sharing & '
+        'privacy screen are also demo only: nothing is connected to Fitbit '
+        'and nothing is shared.',
   ),
   (
     "What we don't do",
@@ -58,7 +61,14 @@ const privacyPolicySections = <(String, String)>[
     'Children',
     'Friend 360 is not directed at children under 13.',
   ),
+  (
+    'Contact',
+    privacyPolicyContact,
+  ),
 ];
+
+const privacyPolicyEffectiveDate = 'November 5, 2026';
+const privacyPolicyContact = 'isaachumphries@isaachumphries.com';
 
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
@@ -76,6 +86,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
               'Friend 360 is a class project (CSC 4330). This policy '
               'describes what the app does today.',
               style: text.bodyLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Effective $privacyPolicyEffectiveDate',
+              style: text.bodySmall,
             ),
             for (final (title, body) in privacyPolicySections) ...[
               const SizedBox(height: 20),

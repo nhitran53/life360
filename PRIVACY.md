@@ -12,7 +12,7 @@ With your permission, Friend 360 reads these from Apple Health (iPhone) or Healt
 
 Today the health data stays on your phone. The app has no accounts and no server, and it does not send your health data anywhere. It is used only to draw your stats and your place on the weekly leaderboard.
 
-The friends and circles you see in the app are sample data for a demo. They are not real people.
+The friends and circles you see in the app are sample data for a demo. They are not real people. The Fitbit connection status and the sharing switches on the Sharing & privacy screen are also demo only: nothing is connected to Fitbit and nothing is shared.
 
 ## What we don't do
 

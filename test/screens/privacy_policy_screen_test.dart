@@ -22,10 +22,12 @@ void main() {
     expect(app.routes!.containsKey(privacyPolicyRoute), isTrue);
   });
 
-  test('PRIVACY.md has the same section headings as the screen', () {
-    final md = File('PRIVACY.md').readAsStringSync();
-    for (final (title, _) in privacyPolicySections) {
-      expect(md, contains('## $title'));
+  test('PRIVACY.md matches the screen text', () {
+    String norm(String t) => t.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final md = norm(File('PRIVACY.md').readAsStringSync());
+    for (final (title, body) in privacyPolicySections) {
+      expect(md, contains(norm('## $title $body')));
     }
+    expect(md, contains('Effective date: $privacyPolicyEffectiveDate'));
   });
 }
