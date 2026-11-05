@@ -9,6 +9,7 @@ import '../theme/circle_colors.dart';
 class CircleMember {
   const CircleMember({
     required this.id,
+    required this.profileId,
     required this.name,
     required this.initial,
     required this.color,
@@ -28,6 +29,10 @@ class CircleMember {
   });
 
   final String id;
+
+  /// Their `UserProfile` id, used to rank them on family leaderboards.
+  final String profileId;
+
   final String name;
   final String initial;
   final Color color;
@@ -75,6 +80,7 @@ const circleActiveGoal = 60;
 
 const circleMom = CircleMember(
   id: 'mom',
+  profileId: 'u_mom',
   name: 'Mom',
   initial: 'M',
   color: CircleColors.avatarMom,
@@ -93,6 +99,7 @@ const circleMom = CircleMember(
 
 const circleDad = CircleMember(
   id: 'dad',
+  profileId: 'u_dad',
   name: 'Dad',
   initial: 'D',
   color: CircleColors.avatarDad,
@@ -113,6 +120,7 @@ const circleDad = CircleMember(
 
 const circleBao = CircleMember(
   id: 'bao',
+  profileId: 'u_bao',
   name: 'Bao',
   initial: 'B',
   color: CircleColors.avatarBao,
@@ -131,6 +139,7 @@ const circleBao = CircleMember(
 
 const circleLinh = CircleMember(
   id: 'linh',
+  profileId: 'u_linh',
   name: 'Linh',
   initial: 'L',
   color: CircleColors.avatarLinh,
@@ -192,6 +201,9 @@ class CircleFamily {
   /// Including you.
   int get memberCount => members.length + 1;
 
+  /// Profile ids of everyone except you, for the family leaderboard.
+  List<String> get profileIds => [for (final m in members) m.profileId];
+
   int get stepsToday =>
       members.fold(circleYouSteps, (sum, member) => sum + member.steps);
 
@@ -206,5 +218,6 @@ const circleTranFamily = CircleFamily(
   listMembers: circleListMembers,
 );
 
-/// The families you start with. New ones are added from the Circle header.
+/// The families you start with. New ones are added from the Circle header
+/// and kept in `FamilyStore`.
 const circleFamilies = [circleTranFamily];

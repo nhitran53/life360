@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../data/family_store.dart';
 import '../data/mock_circle.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
@@ -16,9 +17,16 @@ import 'privacy_screen.dart';
 // ---------------------------------------------------------------------------
 
 class CircleScreen extends StatefulWidget {
-  const CircleScreen({super.key, this.initialTab = CircleTab.circle});
+  const CircleScreen({
+    super.key,
+    this.initialTab = CircleTab.circle,
+    this.familyStore,
+  });
 
   final CircleTab initialTab;
+
+  /// Defaults to [FamilyStore.instance].
+  final FamilyStore? familyStore;
 
   @override
   State<CircleScreen> createState() => _CircleScreenState();
@@ -34,22 +42,22 @@ class _CircleScreenState extends State<CircleScreen> {
   Key _nudgeKey = UniqueKey();
 
   /// Every family you belong to, plus any you create this session.
-  final List<CircleFamily> _families = [...circleFamilies];
+  late final FamilyStore _store = widget.familyStore ?? FamilyStore.instance;
 
   /// The one the Circle home is showing.
-  late CircleFamily _family = _families.first;
+  late CircleFamily _family = _store.families.first;
 
   Future<void> _switchFamily() async {
     final next = await showFamilySwitcher(
       context,
-      families: _families,
+      families: _store.families,
       current: _family,
     );
     if (next == null || !mounted) return;
 
-    final isNew = !_families.contains(next);
+    final isNew = !_store.contains(next);
     setState(() {
-      if (isNew) _families.add(next);
+      if (isNew) _store.add(next);
       _family = next;
     });
     if (isNew) showCircleSnack(context, 'Created ${next.name} 🎉');
@@ -58,7 +66,13 @@ class _CircleScreenState extends State<CircleScreen> {
   void _selectTab(CircleTab tab) {
     if (tab == CircleTab.ranks) {
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const LeaderboardScreen()),
+        // Opens on the family you're looking at; switch from the top of it.
+        MaterialPageRoute<void>(
+          builder: (_) => LeaderboardScreen(
+            initialFamily: _family,
+            familyStore: _store,
+          ),
+        ),
       );
       return;
     }

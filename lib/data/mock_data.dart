@@ -63,7 +63,43 @@ const mockStranger = UserProfile(
   friendCode: 'GIA999',
 );
 
-const mockAllUsers = [mockMe, ...mockFriends, mockRequester, mockStranger];
+/// The Tran family from the Circle screens, so family leaderboards have
+/// people (and stats) to rank. Linked by `CircleMember.profileId`.
+const mockFamily = [
+  UserProfile(
+      id: 'u_mom',
+      displayName: 'Mom',
+      username: 'mom.walks',
+      avatarEmoji: '👩',
+      friendCode: 'MOM100'),
+  UserProfile(
+      id: 'u_dad',
+      displayName: 'Dad',
+      username: 'dad.naps',
+      avatarEmoji: '👨',
+      friendCode: 'DAD200'),
+  UserProfile(
+      id: 'u_bao',
+      displayName: 'Bao',
+      username: 'bao.sprints',
+      avatarEmoji: '⚡',
+      friendCode: 'BAO300'),
+  UserProfile(
+      id: 'u_linh',
+      displayName: 'Linh',
+      username: 'linh.studies',
+      avatarEmoji: '📚',
+      friendCode: 'LINH40'),
+];
+
+// Family goes last so everyone else's generated stats stay the same.
+const mockAllUsers = [
+  mockMe,
+  ...mockFriends,
+  mockRequester,
+  mockStranger,
+  ...mockFamily,
+];
 
 /// Each person's typical day, so their numbers feel consistent.
 class _Persona {
@@ -82,6 +118,10 @@ const _personas = {
   'u_eli': _Persona(10500, 470, 25, 450, 150, 3),
   'u_fin': _Persona(6800, 460, 45, 480, 200, 4),
   'u_gia': _Persona(7000, 500, 40, 380, 170, 5),
+  'u_mom': _Persona(8200, 432, 30, 400, 200, 4),
+  'u_dad': _Persona(4500, 400, 10, 250, 280, 1),
+  'u_bao': _Persona(11800, 485, 55, 600, 190, 6),
+  'u_linh': _Persona(5000, 450, 20, 300, 330, 3),
 };
 
 /// Generates [days] days of stats ending on [today] for every mock user.
