@@ -71,6 +71,20 @@ void main() {
                 expect(find.text('Live · synced 1 min ago'), findsOneWidget);
           });
 
+      testWidgets('Circle home links to My Stats with the connect button',
+              (WidgetTester tester) async {
+                useTallPhone(tester);
+
+                await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
+                await tester.pump();
+                await tester.tap(find.text('My stats and health sync'));
+                await tester.pump();
+                await tester.pump(const Duration(milliseconds: 500));
+
+                expect(find.byType(MyStatsScreen), findsOneWidget);
+                expect(find.byKey(const ValueKey('connect-button')), findsOneWidget);
+          });
+
       testWidgets('Nudging Dad opens the nudge tab and sends',
               (WidgetTester tester) async {
                 useTallPhone(tester);

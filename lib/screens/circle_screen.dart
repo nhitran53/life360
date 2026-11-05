@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../app_services.dart';
 import '../data/family_store.dart';
 import '../data/mock_circle.dart';
 import '../theme/circle_colors.dart';
@@ -8,6 +9,7 @@ import '../widgets/circle_widgets.dart';
 import '../widgets/family_switcher.dart';
 import 'leaderboard_screen.dart';
 import 'member_detail_screen.dart';
+import 'my_stats_screen.dart';
 import 'nudge_screen.dart';
 import 'privacy_screen.dart';
 
@@ -20,10 +22,14 @@ class CircleScreen extends StatefulWidget {
   const CircleScreen({
     super.key,
     this.initialTab = CircleTab.circle,
+    this.services,
     this.familyStore,
   });
 
   final CircleTab initialTab;
+
+  /// Defaults to [AppServices.defaults] when My Stats is opened.
+  final AppServices? services;
 
   /// Defaults to [FamilyStore.instance].
   final FamilyStore? familyStore;
@@ -43,6 +49,9 @@ class _CircleScreenState extends State<CircleScreen> {
 
   /// Every family you belong to, plus any you create this session.
   late final FamilyStore _store = widget.familyStore ?? FamilyStore.instance;
+
+  /// Created on first use so My Stats keeps one connection per Circle visit.
+  late final AppServices _services = widget.services ?? AppServices.defaults();
 
   /// The one the Circle home is showing.
   late CircleFamily _family = _store.families.first;
@@ -77,6 +86,15 @@ class _CircleScreenState extends State<CircleScreen> {
       return;
     }
     setState(() => _tab = tab);
+  }
+
+  void _openMyStats() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            MyStatsScreen(friends: _services.friends, stats: _services.stats),
+      ),
+    );
   }
 
   void _nudge(CircleMember member) {
@@ -119,6 +137,7 @@ class _CircleScreenState extends State<CircleScreen> {
               onSwitchFamily: _switchFamily,
               onOpenMember: _openMember,
               onNudge: _nudge,
+              onOpenMyStats: _openMyStats,
             ),
             NudgeScreen(key: _nudgeKey, initialRecipient: _nudgeRecipient),
             const PrivacyScreen(),
@@ -135,10 +154,12 @@ class _CircleHome extends StatelessWidget {
     required this.onSwitchFamily,
     required this.onOpenMember,
     required this.onNudge,
+    required this.onOpenMyStats,
   });
 
   final CircleFamily family;
   final VoidCallback onSwitchFamily;
+  final VoidCallback onOpenMyStats;
   final ValueChanged<CircleMember> onOpenMember;
   final ValueChanged<CircleMember> onNudge;
 
@@ -154,6 +175,8 @@ class _CircleHome extends StatelessWidget {
           _PulseMap(members: family.mapMembers),
           const SizedBox(height: 14),
           _TogetherToday(steps: family.stepsToday, goal: family.stepsGoal),
+          const SizedBox(height: 14),
+          _MyStatsLink(onTap: onOpenMyStats),
           if (family.listMembers.isEmpty) ...[
             const SizedBox(height: 14),
             _EmptyFamily(name: family.name),
@@ -175,6 +198,47 @@ class _CircleHome extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // HEADER — circle switcher + notifications
 // ---------------------------------------------------------------------------
+
+class _MyStatsLink extends StatelessWidget {
+  const _MyStatsLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: CircleColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: CircleColors.border),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.sync_rounded, size: 20, color: CircleColors.ink),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'My stats and health sync',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: CircleColors.ink,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: CircleColors.muted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _Header extends StatelessWidget {
   const _Header({required this.familyName, required this.onTap});
