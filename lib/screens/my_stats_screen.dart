@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../app_services.dart';
-import '../data/health/health_source.dart';
 import '../data/connectable_stats_repository.dart';
+import '../data/health/health_source.dart';
 import '../models/models.dart';
 import '../theme/app_colors.dart';
 import '../widgets/chunky.dart';
@@ -33,16 +33,31 @@ class MyStatsScreen extends StatefulWidget {
 class _MyStatsScreenState extends State<MyStatsScreen> {
   bool _busy = false;
   bool _failed = false;
-  late Future<_Data> _data = _load();
+  late Future<_Data?> _data = _load();
 
   ConnectableStatsRepository get _stats => widget.services.stats;
 
-  Future<_Data> _load() async {
-    final me = await widget.services.friends.currentUser();
-    final today = DateTime.now();
-    final days = await _stats.dailyStats(me.id, from: today, to: today);
-    final week = await _stats.weeklySummary(me.id);
-    return _Data(days.isEmpty ? null : days.first, week);
+  /// Null when a fetch fails. The error is dropped on purpose: its text
+  /// could carry health details.
+  Future<_Data?> _load() async {
+    // Read everything from widget/State before the first await.
+    final friends = widget.services.friends;
+    final stats = _stats;
+    try {
+      final me = await friends.currentUser();
+      final today = DateTime.now();
+      final days = await stats.dailyStats(me.id, from: today, to: today);
+      final week = await stats.weeklySummary(me.id);
+      return _Data(days.isEmpty ? null : days.first, week);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _retry() {
+    setState(() {
+      _data = _load();
+    });
   }
 
   Future<void> _connect() async {
@@ -71,13 +86,16 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
     final denied = _stats.deniedMetrics;
     return Scaffold(
       appBar: AppBar(title: const Text('My Stats')),
-      body: FutureBuilder<_Data>(
+      body: FutureBuilder<_Data?>(
         future: _data,
         builder: (context, snap) {
-          if (!snap.hasData) {
+          if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          final d = snap.data!;
+          final d = snap.data;
+          if (snap.hasError || d == null) {
+            return _LoadFailed(onRetry: _retry);
+          }
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -105,11 +123,54 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                   metric: m,
                   denied: denied.contains(m),
                   subtitle: m.rankByAverage ? 'daily average' : 'total',
-                  value: formatStat(m, m.leaderboardValue(d.week)),
+                  value: d.week.daysTracked == 0
+                      ? '–'
+                      : formatStat(m, m.leaderboardValue(d.week)),
                 ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Shown when today's or this week's stats can't be loaded.
+class _LoadFailed extends StatelessWidget {
+  const _LoadFailed({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      key: const ValueKey('load-failed'),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.red, size: 40),
+            const SizedBox(height: 12),
+            Text(
+              "Couldn't load your stats",
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Something went wrong. Try again.',
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: AppColors.inkSoft),
+            ),
+            const SizedBox(height: 16),
+            ChunkyButton(
+              key: const ValueKey('retry-button'),
+              label: 'Retry',
+              icon: Icons.refresh,
+              onPressed: onRetry,
+            ),
+          ],
+        ),
       ),
     );
   }
