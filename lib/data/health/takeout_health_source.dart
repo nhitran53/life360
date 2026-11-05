@@ -75,6 +75,13 @@ class TakeoutHealthSource implements HealthSource {
     for (final row in rows) {
       try {
         final r = Map<String, dynamic>.from(row as Map);
+        const metricKeys = [
+          'steps',
+          'sleepMinutes',
+          'workoutMinutes',
+          'activeCalories',
+        ];
+        if (metricKeys.any((k) => ((r[k] as int?) ?? 0) < 0)) continue;
         final s = DailyStats.fromJson({...r, 'userId': userId});
         if (s.date.isBefore(start) || s.date.isAfter(end)) continue;
         if (s.steps + s.sleepMinutes + s.workoutMinutes + s.activeCalories >

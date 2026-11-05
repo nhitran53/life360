@@ -72,6 +72,14 @@ void main() {
     }
   });
 
+  test('skips rows with negative totals', () async {
+    final out = await source(
+      '{"days":[{"date":"2026-01-02","steps":-1},'
+      '{"date":"2026-01-03","steps":5}]}',
+    ).fetchDailyStats('me', from: from, to: to);
+    expect(out.map((d) => d.date.day), [3]);
+  });
+
   test('grants all readable metrics', () async {
     final r = await source('{}').requestPermissions();
     expect(r.readable, source('{}').readableMetrics);
