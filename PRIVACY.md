@@ -1,6 +1,6 @@
 # Friend 360 Privacy Policy
 
-Effective date: [EFFECTIVE DATE - fill in before publishing]
+Effective date: November 5, 2026
 
 Friend 360 is a class project (CSC 4330). This policy describes what the app does today. If that changes, this policy changes before the new behavior ships.
 
@@ -40,4 +40,4 @@ Friend 360 is not directed at children under 13.
 
 ## Contact
 
-[CONTACT EMAIL - fill in before publishing]
+isaachumphries@isaachumphries.com
