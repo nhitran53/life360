@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../data/mock_circle.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
+import 'leaderboard_screen.dart';
 import 'member_detail_screen.dart';
 import 'nudge_screen.dart';
 import 'privacy_screen.dart';
@@ -33,7 +34,9 @@ class _CircleScreenState extends State<CircleScreen> {
 
   void _selectTab(CircleTab tab) {
     if (tab == CircleTab.ranks) {
-      showCircleSnack(context, 'Ranks is coming soon 👀');
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const LeaderboardScreen()),
+      );
       return;
     }
     setState(() => _tab = tab);
@@ -67,7 +70,7 @@ class _CircleScreenState extends State<CircleScreen> {
       body: SafeArea(
         bottom: false,
         child: IndexedStack(
-          // Ranks never becomes active, so it has no page yet.
+          // Ranks never becomes active: it pushes the leaderboard as its own page.
           index: switch (_tab) {
             CircleTab.circle || CircleTab.ranks => 0,
             CircleTab.nudges => 1,
