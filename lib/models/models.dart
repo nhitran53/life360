@@ -1,6 +1,7 @@
 /// Barrel file: `import 'package:life360/models/models.dart';`
 library;
 
+export 'daily_goals.dart';
 export 'daily_stats.dart';
 export 'dates.dart';
 export 'friendship.dart';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/leaderboard_screen.dart';
+import 'screens/my_stats_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'widgets/chunky.dart';
@@ -29,6 +30,7 @@ class _HubItem {
   final Widget Function()? screen;
 }
 
+Widget _myStats() => const MyStatsScreen();
 Widget _leaderboard() => const LeaderboardScreen();
 
 const _hubItems = [
@@ -38,6 +40,7 @@ const _hubItems = [
     subtitle: 'Steps, sleep, workouts and more',
     color: AppColors.primary,
     edgeColor: AppColors.primaryDark,
+    screen: _myStats,
   ),
   _HubItem(
     icon: Icons.group_rounded,
