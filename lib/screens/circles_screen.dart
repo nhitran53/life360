@@ -352,7 +352,7 @@ class _TypeChip extends StatelessWidget {
         child: Text(
           '${type.emoji} ${type.label}',
           style: Theme.of(context).textTheme.labelLarge
-              ?.copyWith(color: selected ? Colors.white : AppColors.inkSoft),
+              ?.copyWith(color: selected ? AppColors.surface : AppColors.inkSoft),
         ),
       ),
     );

@@ -149,9 +149,19 @@ class _CircleDetailScreenState extends State<CircleDetailScreen> {
                     final standings = snapshot.data;
                     if (standings == null) {
                       return snapshot.hasError
-                          ? Text(
-                              "Couldn't load the standings. Try again in a sec.",
-                              style: text.bodyMedium,
+                          ? Column(
+                              children: [
+                                Text(
+                                  "Couldn't load the standings.",
+                                  style: text.bodyMedium,
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(() {
+                                    _cache.remove(_metric);
+                                  }),
+                                  child: const Text('Try again'),
+                                ),
+                              ],
                             )
                           : const Center(child: CircularProgressIndicator());
                     }
@@ -384,7 +394,7 @@ class _MetricToggle extends StatelessWidget {
                       '${metric.stat.emoji} ${metric.stat.label}',
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: metric == selected
-                            ? Colors.white
+                            ? AppColors.surface
                             : AppColors.inkSoft,
                       ),
                     ),

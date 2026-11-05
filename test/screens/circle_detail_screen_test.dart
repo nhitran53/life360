@@ -27,6 +27,25 @@ class _EmptyWeekStats extends MockStatsRepository {
   ];
 }
 
+/// Fails the first leaderboard call, then works.
+class _FailOnceStats extends MockStatsRepository {
+  _FailOnceStats({required super.friends, super.clock});
+  var failed = false;
+
+  @override
+  Future<List<LeaderboardEntry>> leaderboard(
+    StatMetric metric, {
+    DateTime? weekOf,
+    Iterable<String>? userIds,
+  }) {
+    if (!failed) {
+      failed = true;
+      throw StateError('boom');
+    }
+    return super.leaderboard(metric, weekOf: weekOf, userIds: userIds);
+  }
+}
+
 void main() {
   // A Wednesday afternoon.
   final now = DateTime(2026, 11, 4, 15);
@@ -212,5 +231,18 @@ void main() {
       (await circles.circles()).map((c) => c.id),
       isNot(contains('c_dorm')),
     );
+  });
+
+  testWidgets('a failed standings load can be retried in place', (
+    tester,
+  ) async {
+    stats = _FailOnceStats(friends: friends, clock: clock);
+    await pumpDetail(tester, 'c_gym');
+    expect(find.text("Couldn't load the standings."), findsOneWidget);
+
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('standing-u_me')), findsOneWidget);
   });
 }
