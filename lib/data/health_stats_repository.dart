@@ -1,4 +1,5 @@
 import '../models/models.dart';
+import 'connectable_stats_repository.dart';
 import 'friends_repository.dart';
 import 'health/health_source.dart';
 import 'stats_repository.dart';
@@ -9,7 +10,7 @@ import 'stats_repository.dart';
 ///
 /// Health data is only used after [connect] succeeds. Until then (or if the
 /// user denies everything) the fallback, e.g. the mock repository, serves it.
-class HealthStatsRepository implements StatsRepository {
+class HealthStatsRepository implements ConnectableStatsRepository {
   HealthStatsRepository({
     required this._source,
     required this._fallback,
@@ -28,20 +29,25 @@ class HealthStatsRepository implements StatsRepository {
   DateTime? _lastSyncedAt;
 
   /// "Apple Health" or "Health Connect", for the UI.
+  @override
   String get sourceName => _source.displayName;
 
   /// Whether the current user's stats now come from the health platform.
+  @override
   bool get isConnected => _connected;
 
   /// Result of the last [connect], or null before the first attempt.
+  @override
   HealthAvailability? get availability => _availability;
 
   /// When the last successful [connect] finished, or null.
+  @override
   DateTime? get lastSyncedAt => _lastSyncedAt;
 
   /// Metrics the user turned down in the last [connect]. Their values are
   /// unknown, not 0, so the UI must not show them as numbers. Empty before
   /// connecting; on iOS reads are never reported as denied.
+  @override
   Set<StatMetric> get deniedMetrics {
     final permissions = _permissions;
     if (permissions == null) return const {};
@@ -54,6 +60,7 @@ class HealthStatsRepository implements StatsRepository {
   ///
   /// Also the manual re-sync: it re-checks permissions, which the user may
   /// have changed in the system settings, and stamps [lastSyncedAt].
+  @override
   Future<bool> connect() async {
     _availability = await _source.availability();
     if (_availability != HealthAvailability.available) {
@@ -67,6 +74,7 @@ class HealthStatsRepository implements StatsRepository {
   }
 
   /// Sends the user to the store to install or update the health app.
+  @override
   Future<void> openInstallPage() => _source.openInstallPage();
 
   Future<bool> _usesHealth(String userId) async =>

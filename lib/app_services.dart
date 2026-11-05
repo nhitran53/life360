@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'data/connectable_stats_repository.dart';
 import 'data/friends_repository.dart';
 import 'data/health/fake_health_source.dart';
 import 'data/health/health_package_source.dart';
@@ -38,5 +39,5 @@ class AppServices {
   }
 
   final FriendsRepository friends;
-  final HealthStatsRepository stats;
+  final ConnectableStatsRepository stats;
 }

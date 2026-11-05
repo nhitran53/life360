@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_services.dart';
 import '../data/health/health_source.dart';
-import '../data/health_stats_repository.dart';
+import '../data/connectable_stats_repository.dart';
 import '../models/models.dart';
 import '../theme/app_colors.dart';
 import '../widgets/chunky.dart';
@@ -35,7 +35,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
   bool _failed = false;
   late Future<_Data> _data = _load();
 
-  HealthStatsRepository get _stats => widget.services.stats;
+  ConnectableStatsRepository get _stats => widget.services.stats;
 
   Future<_Data> _load() async {
     final me = await widget.services.friends.currentUser();
@@ -160,7 +160,7 @@ class _ConnectCard extends StatelessWidget {
     required this.onInstall,
   });
 
-  final HealthStatsRepository stats;
+  final ConnectableStatsRepository stats;
   final bool busy;
   final bool failed;
   final VoidCallback onConnect;
