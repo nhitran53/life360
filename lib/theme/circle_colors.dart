@@ -11,6 +11,32 @@ class CircleColors {
   static const progressTrack = Color(0xFFEFEDE8);
   static const progressFill = Color(0xFF2D5BD8);
 
+  /// Outline of secondary buttons and the note text area.
+  static const outline = Color(0xFFD7D4CC);
+
+  /// Row dividers, unselected chips and weekly bars' track.
+  static const divider = Color(0xFFEFEDE8);
+
+  /// Unselected quick-note rows.
+  static const noteBackground = Color(0xFFFBFAF7);
+
+  /// Unchecked checkbox border.
+  static const checkboxOff = Color(0xFF8A8F99);
+
+  // "All good" green (normal heart rate, connected device).
+  static const okBackground = Color(0xFFE3F2EA);
+  static const okText = Color(0xFF0B6E4A);
+  static const okTextDark = Color(0xFF0B5A3C);
+
+  /// Active minutes progress.
+  static const active = Color(0xFFC25E00);
+
+  /// Past days in the weekly steps chart (today uses [progressFill]).
+  static const weekBar = Color(0xFFC9D6F5);
+
+  /// Outline of destructive buttons (text uses [heart]).
+  static const dangerOutline = Color(0xFFE8B4BD);
+
   static const ink = Color(0xFF15171C);
   static const secondary = Color(0xFF555B67);
   static const muted = Color(0xFF6B717D);

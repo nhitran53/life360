@@ -9,6 +9,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/hub_screen.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
+import 'package:life360/widgets/circle_widgets.dart';
+
+/// A tall phone so whole Circle screens fit without scrolling.
+void useTallPhone(WidgetTester tester) {
+  tester.view.physicalSize = const Size(1170, 2900);
+  tester.view.devicePixelRatio = 3.0;
+  addTearDown(tester.view.reset);
+}
 
 void main() {
   testWidgets('Home screen shows logo, name, tagline and button',
@@ -45,9 +53,7 @@ void main() {
 
   testWidgets('Circle home shows totals and members',
           (WidgetTester tester) async {
-        tester.view.physicalSize = const Size(1170, 2532);
-        tester.view.devicePixelRatio = 3.0;
-        addTearDown(tester.view.reset);
+        useTallPhone(tester);
 
         await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
         await tester.pump();
@@ -62,11 +68,9 @@ void main() {
         expect(find.text('Live · synced 1 min ago'), findsOneWidget);
       });
 
-  testWidgets('Nudging Dad shows a confirmation',
+  testWidgets('Nudging Dad opens the nudge tab and sends',
           (WidgetTester tester) async {
-        tester.view.physicalSize = const Size(1170, 2532);
-        tester.view.devicePixelRatio = 3.0;
-        addTearDown(tester.view.reset);
+        useTallPhone(tester);
 
         await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
         await tester.pump();
@@ -74,7 +78,89 @@ void main() {
         await tester.tap(find.text('Nudge'));
         await tester.pump();
 
+        expect(find.text('Send a nudge'), findsOneWidget);
+        expect(find.text('Dad has been idle for 3 hours · 3,105 steps today'),
+            findsOneWidget);
+
+        await tester.ensureVisible(find.text('Send to Dad'));
+        await tester.tap(find.text('Send to Dad'));
+        await tester.pump();
+
         expect(find.text('Nudge sent to Dad 👋'), findsOneWidget);
+      });
+
+  testWidgets('Tapping a member opens their detail page',
+          (WidgetTester tester) async {
+        useTallPhone(tester);
+
+        await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
+        await tester.pump();
+
+        await tester.tap(find.text('Walking · now'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Shares heart rate, steps & sleep'), findsOneWidget);
+        expect(find.text('bpm · walking'), findsOneWidget);
+        expect(find.text('Steps this week'), findsOneWidget);
+        expect(find.text('54,130'), findsOneWidget);
+        expect(find.text('Cheer her on'), findsOneWidget);
+
+        // "Send a note" goes back and starts a nudge to Mom.
+        await tester.ensureVisible(find.text('Send a note'));
+        await tester.tap(find.text('Send a note'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Send to Mom'), findsOneWidget);
+      });
+
+  testWidgets('Nudge screen picks recipients and quick notes',
+          (WidgetTester tester) async {
+        useTallPhone(tester);
+
+        await tester.pumpWidget(const MaterialApp(
+            home: CircleScreen(initialTab: CircleTab.nudges)));
+        await tester.pump();
+
+        expect(find.text('Send to Dad'), findsOneWidget);
+
+        await tester.ensureVisible(find.text('Linh'));
+        await tester.tap(find.text('Linh'));
+        await tester.pump();
+        expect(find.text('Send to Linh'), findsOneWidget);
+
+        await tester.ensureVisible(find.text('Join me for a walk at 6 tonight?'));
+        await tester.tap(find.text('Join me for a walk at 6 tonight?'));
+        await tester.pump();
+        final note = tester.widget<TextField>(find.byType(TextField));
+        expect(note.controller!.text, 'Join me for a walk at 6 tonight?');
+      });
+
+  testWidgets('Privacy screen keeps sleep private and toggles sharing',
+          (WidgetTester tester) async {
+        useTallPhone(tester);
+
+        await tester.pumpWidget(const MaterialApp(
+            home: CircleScreen(initialTab: CircleTab.privacy)));
+        await tester.pump();
+
+        Finder switches(String state) => find.byWidgetPredicate(
+            (w) => w is CircleSvg && w.name == 'switch_$state');
+
+        expect(find.text('Sharing & privacy'), findsOneWidget);
+        // Heart rate, steps and active minutes on; sleep private.
+        expect(switches('on'), findsNWidgets(3));
+        expect(switches('off'), findsOneWidget);
+
+        await tester.ensureVisible(find.text('Sleep'));
+        await tester.tap(find.text('Sleep'));
+        await tester.pump();
+        expect(switches('on'), findsNWidgets(4));
+        expect(switches('off'), findsNothing);
+
+        await tester.ensureVisible(find.text('Pause for 24 h'));
+        await tester.tap(find.text('Pause for 24 h'));
+        await tester.pump();
+        expect(find.text('Resume sharing'), findsOneWidget);
       });
 
   testWidgets('Tapping a hub card opens its page',

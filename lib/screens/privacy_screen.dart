@@ -1,0 +1,314 @@
+import 'package:flutter/material.dart';
+
+import '../theme/circle_colors.dart';
+import '../widgets/circle_widgets.dart';
+
+// ---------------------------------------------------------------------------
+// SHARING & PRIVACY — connected device, what you share and who sees it
+// ---------------------------------------------------------------------------
+
+class _ShareOption {
+  const _ShareOption(this.title, this.subtitle);
+
+  final String title;
+  final String subtitle;
+}
+
+const _shareOptions = [
+  _ShareOption('Heart rate', 'Live bpm and resting average'),
+  _ShareOption('Steps & distance', 'Counts toward leaderboards'),
+  _ShareOption('Active minutes', 'Workouts and activity status'),
+  _ShareOption('Sleep', 'Duration only, never stages'),
+];
+
+class _Audience {
+  const _Audience(this.name, this.size, this.access);
+
+  final String name;
+  final String size;
+  final String access;
+}
+
+const _audiences = [
+  _Audience('Tran family', '5 members', 'Everything shared'),
+  _Audience('Morning walkers', '8 friends', 'Steps only'),
+];
+
+class PrivacyScreen extends StatefulWidget {
+  const PrivacyScreen({super.key});
+
+  @override
+  State<PrivacyScreen> createState() => _PrivacyScreenState();
+}
+
+class _PrivacyScreenState extends State<PrivacyScreen> {
+  /// One per [_shareOptions]. Sleep is private until the user opts in.
+  final _sharing = [true, true, true, false];
+
+  bool _paused = false;
+
+  void _togglePause() {
+    setState(() => _paused = !_paused);
+    showCircleSnack(
+      context,
+      _paused ? 'Sharing paused for 24 h' : 'Sharing is back on',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const CircleTitle(
+            title: 'Sharing & privacy',
+            subtitle: 'You decide who sees what. Change it anytime.',
+          ),
+          const SizedBox(height: 14),
+          _FitbitCard(
+            paused: _paused,
+            onManage: () =>
+                showCircleSnack(context, 'Managing Fitbit is coming soon 👀'),
+          ),
+          const SizedBox(height: 14),
+          _Section(
+            label: 'What you share',
+            rowHeight: 54,
+            rows: [
+              for (var i = 0; i < _shareOptions.length; i++)
+                _SettingRow(
+                  title: _shareOptions[i].title,
+                  subtitle: _shareOptions[i].subtitle,
+                  trailing: _Switch(value: _sharing[i]),
+                  toggled: _sharing[i],
+                  onTap: () => setState(() => _sharing[i] = !_sharing[i]),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _Section(
+            label: 'Who can see it',
+            rowHeight: 58,
+            rows: [
+              for (final audience in _audiences)
+                _SettingRow(
+                  title: audience.name,
+                  subtitle: audience.size,
+                  trailing: CirclePillButton(
+                    label: audience.access,
+                    horizontalPadding: 12,
+                    onPressed: () => showCircleSnack(
+                      context,
+                      'Choosing what ${audience.name} sees is coming soon 👀',
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: CirclePillButton(
+                  label: _paused ? 'Resume sharing' : 'Pause for 24 h',
+                  height: 48,
+                  fontSize: 14,
+                  horizontalPadding: 16,
+                  onPressed: _togglePause,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CirclePillButton(
+                  label: 'Disconnect',
+                  height: 48,
+                  fontSize: 14,
+                  horizontalPadding: 16,
+                  borderColor: CircleColors.dangerOutline,
+                  textColor: CircleColors.heart,
+                  onPressed: () => showCircleSnack(
+                    context,
+                    'Disconnecting Fitbit is coming soon 👀',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FitbitCard extends StatelessWidget {
+  const _FitbitCard({required this.paused, required this.onManage});
+
+  final bool paused;
+  final VoidCallback onManage;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleCard(
+      radius: 18,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: CircleColors.okBackground,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const CircleSvg('icon_link', size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Google Fitbit',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: CircleColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  paused
+                      ? 'Paused · sharing resumes in 24 h'
+                      : 'Connected · last sync 2 min ago',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: paused
+                        ? CircleColors.secondary
+                        : CircleColors.okTextDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          CirclePillButton(label: 'Manage', onPressed: onManage),
+        ],
+      ),
+    );
+  }
+}
+
+/// White card with a small label and divided rows.
+class _Section extends StatelessWidget {
+  const _Section({
+    required this.label,
+    required this.rowHeight,
+    required this.rows,
+  });
+
+  final String label;
+  final double rowHeight;
+  final List<Widget> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleCard(
+      radius: 18,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CircleSectionLabel(label),
+          for (var i = 0; i < rows.length; i++)
+            Container(
+              constraints: BoxConstraints(minHeight: rowHeight),
+              decoration: i == rows.length - 1
+                  ? null
+                  : const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: CircleColors.divider),
+                      ),
+                    ),
+              child: rows[i],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    this.toggled,
+    this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget trailing;
+
+  /// Set for switch rows so screen readers announce on/off.
+  final bool? toggled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: CircleColors.ink,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: CircleColors.secondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          trailing,
+        ],
+      ),
+    );
+
+    final onTap = this.onTap;
+    if (onTap == null) return row;
+    return Semantics(
+      toggled: toggled,
+      child: InkWell(onTap: onTap, child: row),
+    );
+  }
+}
+
+class _Switch extends StatelessWidget {
+  const _Switch({required this.value});
+
+  final bool value;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleSvg(value ? 'switch_on' : 'switch_off', size: 46, height: 28);
+  }
+}
