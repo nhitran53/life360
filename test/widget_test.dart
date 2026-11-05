@@ -169,7 +169,7 @@ void main() {
         await tester.pumpWidget(const MaterialApp(home: HubScreen()));
         await tester.pump(const Duration(seconds: 2));
 
-        await tester.tap(find.text('My Stats'));
+        await tester.tap(find.text("Friends' Stats"));
         await tester.pump();
         await tester.pump(const Duration(seconds: 1));
 

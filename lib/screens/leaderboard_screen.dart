@@ -10,7 +10,9 @@ import '../models/models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/stat_colors.dart';
+import '../utils/format.dart';
 import '../widgets/chunky.dart';
+import 'my_stats_screen.dart';
 
 // ---------------------------------------------------------------------------
 // LEADERBOARD — weekly ranking among friends, top 3 on a podium
@@ -121,7 +123,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Leaderboard')),
+      appBar: AppBar(
+        title: const Text('Leaderboard'),
+        actions: [
+          IconButton(
+            tooltip: 'My stats',
+            icon: const Icon(Icons.insights_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MyStatsScreen(
+                    friends: _friends, stats: _stats, clock: _clock),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: Column(
@@ -675,25 +691,6 @@ String weekResetLabel(DateTime now) {
     return 'Resets in $h ${h == 1 ? 'hour' : 'hours'}';
   }
   return 'Resets in ${math.max(1, left.inMinutes)} min';
-}
-
-/// 38412 → "38,412".
-String formatThousands(int n) {
-  final digits = n.abs().toString();
-  final buf = StringBuffer(n < 0 ? '-' : '');
-  for (var i = 0; i < digits.length; i++) {
-    if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
-    buf.write(digits[i]);
-  }
-  return buf.toString();
-}
-
-/// 432 → "7h 12m", 45 → "45m".
-String formatMinutes(int minutes) {
-  final h = minutes ~/ 60;
-  final m = minutes % 60;
-  if (h == 0) return '${m}m';
-  return '${h}h ${m.toString().padLeft(2, '0')}m';
 }
 
 String ordinal(int n) {
