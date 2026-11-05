@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/hub_screen.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
+import 'package:life360/screens/leaderboard_screen.dart';
 import 'package:life360/widgets/circle_widgets.dart';
 
 /// A tall phone so whole Circle screens fit without scrolling.
@@ -173,6 +174,29 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
 
         expect(find.text('Coming soon 👀'), findsOneWidget);
+      });
+
+  testWidgets('Ranks tab on the circle home opens the leaderboard',
+          (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(1170, 2532);
+        tester.view.devicePixelRatio = 3.0;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
+        await tester.tap(find.text('Ranks'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LeaderboardScreen), findsOneWidget);
+        expect(find.text('This week'), findsOneWidget);
+      });
+
+  testWidgets('Leaderboard hub card opens the leaderboard',
+          (WidgetTester tester) async {
+        await tester.pumpWidget(const MaterialApp(home: HubScreen()));
+        await tester.tap(find.text('Leaderboard'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LeaderboardScreen), findsOneWidget);
       });
 
   testWidgets('Hub shows all three destinations',

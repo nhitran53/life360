@@ -9,6 +9,12 @@ abstract final class AppColors {
   static const primaryDark = Color(0xFF46A302);
   static const primarySoft = Color(0xFFD7FFB8);
 
+  /// Very light green background, e.g. to highlight "you" in a list.
+  static const primaryTint = Color(0xFFF1FFE6);
+
+  /// Green that is dark enough for small text on white (≈4.5:1).
+  static const primaryText = Color(0xFF3B8500);
+
   static const blue = Color(0xFF1CB0F6);
   static const blueDark = Color(0xFF1899D6);
 
@@ -17,6 +23,9 @@ abstract final class AppColors {
 
   static const red = Color(0xFFFF4B4B);
   static const redDark = Color(0xFFEA2B2B);
+
+  /// Red that is dark enough for small text on white (≈4.5:1).
+  static const redText = Color(0xFFD12F2F);
 
   static const purple = Color(0xFFCE82FF);
   static const purpleDark = Color(0xFFA568CC);

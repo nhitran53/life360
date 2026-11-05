@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'screens/leaderboard_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'widgets/chunky.dart';
@@ -15,6 +16,7 @@ class _HubItem {
     required this.subtitle,
     required this.color,
     required this.edgeColor,
+    this.screen,
   });
 
   final IconData icon;
@@ -22,7 +24,12 @@ class _HubItem {
   final String subtitle;
   final Color color;
   final Color edgeColor;
+
+  /// Null shows a "coming soon" page.
+  final Widget Function()? screen;
 }
+
+Widget _leaderboard() => const LeaderboardScreen();
 
 const _hubItems = [
   _HubItem(
@@ -45,6 +52,7 @@ const _hubItems = [
     subtitle: "Who's on top this week?",
     color: AppColors.gold,
     edgeColor: AppColors.goldDark,
+    screen: _leaderboard,
   ),
 ];
 
@@ -52,10 +60,12 @@ class HubScreen extends StatelessWidget {
   const HubScreen({super.key});
 
   void _open(BuildContext context, _HubItem item) {
-    // TODO: swap ComingSoonPage for the real screens as they're built.
+    final screen = item.screen;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ComingSoonPage(title: item.title, icon: item.icon),
+        builder: (_) => screen != null
+            ? screen()
+            : ComingSoonPage(title: item.title, icon: item.icon),
       ),
     );
   }
