@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/mock_data.dart';
+import '../data/sharing_repository.dart';
+import '../models/models.dart';
 import '../theme/circle_colors.dart';
 import 'privacy_policy_screen.dart';
 import '../widgets/circle_widgets.dart';
@@ -8,19 +11,14 @@ import '../widgets/circle_widgets.dart';
 // SHARING & PRIVACY — connected device, what you share and who sees it
 // ---------------------------------------------------------------------------
 
-class _ShareOption {
-  const _ShareOption(this.title, this.subtitle);
-
-  final String title;
-  final String subtitle;
-}
-
-const _shareOptions = [
-  _ShareOption('Heart rate', 'Live bpm and resting average'),
-  _ShareOption('Steps & distance', 'Counts toward leaderboards'),
-  _ShareOption('Active minutes', 'Workouts and activity status'),
-  _ShareOption('Sleep', 'Duration only, never stages'),
-];
+/// One line under each stat's name, in the order of [StatMetric.values].
+String _shareSubtitle(StatMetric metric) => switch (metric) {
+  StatMetric.steps => 'Counts toward the Steps board',
+  StatMetric.sleep => 'Duration only, never stages',
+  StatMetric.workout => 'Workout minutes and streaks',
+  StatMetric.calories => 'Active calories burned',
+  StatMetric.screenTime => 'Daily total, if you track it',
+};
 
 class _Audience {
   const _Audience(this.name, this.size, this.access);
@@ -36,28 +34,63 @@ const _audiences = [
 ];
 
 class PrivacyScreen extends StatefulWidget {
-  const PrivacyScreen({super.key});
+  const PrivacyScreen({super.key, this.sharing, this.userId, this.clock});
+
+  /// Where the choices are saved. Defaults to an in-memory mock.
+  final SharingRepository? sharing;
+
+  /// Whose settings these are. Defaults to the mock current user.
+  final String? userId;
+
+  final DateTime Function()? clock;
 
   @override
   State<PrivacyScreen> createState() => _PrivacyScreenState();
 }
 
 class _PrivacyScreenState extends State<PrivacyScreen> {
-  /// One per [_shareOptions]. Sleep is private until the user opts in.
-  final _sharing = [true, true, true, false];
+  late final SharingRepository _repo =
+      widget.sharing ?? (_ownRepo = MockSharingRepository());
+  MockSharingRepository? _ownRepo;
 
-  bool _paused = false;
+  late final String _userId = widget.userId ?? mockMe.id;
+  late final DateTime Function() _clock = widget.clock ?? DateTime.now;
+
+  SharingSettings get _settings => _repo.settingsFor(_userId);
+
+  @override
+  void dispose() {
+    _ownRepo?.dispose();
+    super.dispose();
+  }
+
+  void _toggle(StatMetric metric) {
+    final shared = !_settings.hidden.contains(metric);
+    _repo.update(_userId, _settings.withShared(metric, !shared));
+  }
 
   void _togglePause() {
-    setState(() => _paused = !_paused);
+    final now = _clock();
+    final pausing = !_settings.isPaused(now);
+    _repo.update(
+      _userId,
+      _settings.withPause(pausing ? now.add(const Duration(hours: 24)) : null),
+    );
     showCircleSnack(
       context,
-      _paused ? 'Sharing paused for 24 h' : 'Sharing is back on',
+      pausing ? 'Sharing paused for 24 h' : 'Sharing is back on',
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: _repo, builder: _build);
+  }
+
+  Widget _build(BuildContext context, Widget? _) {
+    final settings = _settings;
+    final paused = settings.isPaused(_clock());
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Column(
@@ -69,7 +102,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           ),
           const SizedBox(height: 14),
           _FitbitCard(
-            paused: _paused,
+            paused: paused,
             onManage: () =>
                 showCircleSnack(context, 'Managing Fitbit is coming soon 👀'),
           ),
@@ -78,15 +111,26 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
             label: 'What you share',
             rowHeight: 54,
             rows: [
-              for (var i = 0; i < _shareOptions.length; i++)
+              for (final metric in StatMetric.values)
                 _SettingRow(
-                  title: _shareOptions[i].title,
-                  subtitle: _shareOptions[i].subtitle,
-                  trailing: _Switch(value: _sharing[i]),
-                  toggled: _sharing[i],
-                  onTap: () => setState(() => _sharing[i] = !_sharing[i]),
+                  title: metric.label,
+                  subtitle: _shareSubtitle(metric),
+                  trailing: _Switch(value: !settings.hidden.contains(metric)),
+                  toggled: !settings.hidden.contains(metric),
+                  onTap: () => _toggle(metric),
                 ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            paused
+                ? 'Paused: friends see none of your stats for now 🔒'
+                : "Private stats stay off friends' screens and leaderboards 🔒",
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: CircleColors.secondary,
+            ),
           ),
           const SizedBox(height: 14),
           _Section(
@@ -113,7 +157,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
             children: [
               Expanded(
                 child: CirclePillButton(
-                  label: _paused ? 'Resume sharing' : 'Pause for 24 h',
+                  label: paused ? 'Resume sharing' : 'Pause for 24 h',
                   height: 48,
                   fontSize: 14,
                   horizontalPadding: 16,

@@ -7,6 +7,7 @@ import '../data/friends_repository.dart';
 import '../data/mock_circle.dart';
 import '../data/mock_friends_repository.dart';
 import '../data/mock_stats_repository.dart';
+import '../data/sharing_repository.dart';
 import '../data/stats_repository.dart';
 import '../models/models.dart';
 import '../theme/app_colors.dart';
@@ -66,6 +67,7 @@ class LeaderboardScreen extends StatefulWidget {
     this.clock,
     this.initialFamily,
     this.familyStore,
+    this.sharing,
   });
 
   /// Defaults to mock repositories until the backend exists.
@@ -79,6 +81,10 @@ class LeaderboardScreen extends StatefulWidget {
   /// Families you can switch to. Defaults to [FamilyStore.instance].
   final FamilyStore? familyStore;
 
+  /// Used to explain why you're missing from a board you keep private.
+  /// The filtering itself happens in [stats].
+  final SharingRepository? sharing;
+
   @override
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
 }
@@ -88,6 +94,7 @@ class _BoardData {
     required this.entries,
     required this.lastWeekRanks,
     required this.meId,
+    this.youKeepPrivate = false,
   });
 
   final List<LeaderboardEntry> entries;
@@ -95,6 +102,9 @@ class _BoardData {
   /// User id → rank on the same board last week.
   final Map<String, int> lastWeekRanks;
   final String meId;
+
+  /// You chose not to share this board's stat (or paused sharing).
+  final bool youKeepPrivate;
 
   /// Places gained since last week (negative = dropped). Null if unknown.
   int? movement(LeaderboardEntry e) {
@@ -138,10 +148,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
       final results = await Future.wait([fetch(now), fetch(lastWeek)]);
       final me = await _friends.currentUser();
+      final mine = widget.sharing?.settingsFor(me.id);
+      final metric = board.metric;
       return _BoardData(
         entries: results[0],
         lastWeekRanks: {for (final e in results[1]) e.user.id: e.rank},
         meId: me.id,
+        youKeepPrivate: mine != null &&
+            (metric == null
+                ? mine.isPaused(now)
+                : !mine.isShared(metric, now)),
       );
     });
   }
@@ -239,7 +255,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       key: ValueKey(_key),
                       board: _board,
                       data: snapshot.data!,
-                      soloText: family == null
+                      // Only for a family with nobody else in it yet. A
+                      // board can also be short because people keep a
+                      // stat private; _BoardView explains that instead.
+                      soloText: family == null || family.profileIds.isNotEmpty
                           ? null
                           : "It's just you in ${family.name} so far. "
                           'Invite people to start a leaderboard 🏁',
@@ -530,6 +549,24 @@ class _BoardView extends StatelessWidget {
   Widget build(BuildContext context) {
     final entries = data.entries;
     final soloText = this.soloText;
+    final metric = board.metric;
+    // You're always on a board unless you keep its stat private, so an
+    // empty metric board means nobody here shares it.
+    if (entries.isEmpty && metric != null) {
+      return _Message(
+        text: 'Nobody here shares their ${metric.label.toLowerCase()} yet 🔒'
+            '${data.youKeepPrivate ? '\nTurn it on in Privacy to be the first.' : ''}',
+      );
+    }
+    if (metric != null &&
+        soloText == null &&
+        entries.length == 1 &&
+        entries.single.user.id == data.meId) {
+      return _Message(
+        text: "You're the only one here sharing your "
+            '${metric.label.toLowerCase()} so far 🔒',
+      );
+    }
     if (soloText != null && entries.length < 2) {
       return _Message(text: soloText);
     }
@@ -741,7 +778,12 @@ class _NudgeLine extends StatelessWidget {
       color: AppColors.surfaceSunken,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Text(
-        nudgeMessage(board, data.entries, data.meId),
+        nudgeMessage(
+          board,
+          data.entries,
+          data.meId,
+          youKeepPrivate: data.youKeepPrivate,
+        ),
         style: Theme.of(context).textTheme.bodyMedium,
       ),
     );
@@ -749,10 +791,20 @@ class _NudgeLine extends StatelessWidget {
 }
 
 /// Friendly one-liner about the gap to the person right above you.
+///
+/// [youKeepPrivate]: you're off this board because you don't share its stat.
 String nudgeMessage(
-    LeaderboardBoard board, List<LeaderboardEntry> entries, String meId) {
+  LeaderboardBoard board,
+  List<LeaderboardEntry> entries,
+  String meId, {
+  bool youKeepPrivate = false,
+}) {
   final i = entries.indexWhere((e) => e.user.id == meId);
-  if (i == -1) return 'Sync your stats to join the race 🏁';
+  if (i == -1) {
+    return youKeepPrivate
+        ? "You keep this one private, so you're not on this board 🔒"
+        : 'Sync your stats to join the race 🏁';
+  }
   final me = entries[i];
   if (me.rank == 1) {
     return entries.length > 1 && entries[1].rank == 1

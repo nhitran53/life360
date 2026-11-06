@@ -36,7 +36,7 @@ Widget _myStats(AppServices s) =>
     MyStatsScreen(friends: s.friends, stats: s.stats);
 
 Widget _leaderboard(AppServices s) =>
-    LeaderboardScreen(friends: s.friends, stats: s.stats);
+    LeaderboardScreen(friends: s.friends, stats: s.stats, sharing: s.sharing);
 
 Widget _circles(AppServices s) =>
     CirclesScreen(circles: s.circles, friends: s.friends, stats: s.stats);

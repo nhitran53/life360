@@ -78,6 +78,9 @@ class _CircleScreenState extends State<CircleScreen> {
         // Opens on the family you're looking at; switch from the top of it.
         MaterialPageRoute<void>(
           builder: (_) => LeaderboardScreen(
+            friends: _services.friends,
+            stats: _services.stats,
+            sharing: _services.sharing,
             initialFamily: _family,
             familyStore: _store,
           ),
@@ -140,7 +143,7 @@ class _CircleScreenState extends State<CircleScreen> {
               onOpenMyStats: _openMyStats,
             ),
             NudgeScreen(key: _nudgeKey, initialRecipient: _nudgeRecipient),
-            const PrivacyScreen(),
+            PrivacyScreen(sharing: _services.sharing),
           ],
         ),
       ),
