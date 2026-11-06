@@ -5,6 +5,7 @@ export 'circle.dart';
 export 'daily_goals.dart';
 export 'daily_stats.dart';
 export 'dates.dart';
+export 'friend_stats.dart';
 export 'friendship.dart';
 export 'leaderboard_entry.dart';
 export 'stat_metric.dart';

@@ -7,6 +7,7 @@ import '../data/mock_circle.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
 import '../widgets/family_switcher.dart';
+import 'friends_stats_screen.dart';
 import 'leaderboard_screen.dart';
 import 'member_detail_screen.dart';
 import 'my_stats_screen.dart';
@@ -100,6 +101,18 @@ class _CircleScreenState extends State<CircleScreen> {
     );
   }
 
+  void _openFriendsStats() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FriendsStatsScreen(
+          friends: _services.friends,
+          stats: _services.stats,
+          sharing: _services.sharing,
+        ),
+      ),
+    );
+  }
+
   void _nudge(CircleMember member) {
     setState(() {
       _nudgeRecipient = member;
@@ -141,6 +154,7 @@ class _CircleScreenState extends State<CircleScreen> {
               onOpenMember: _openMember,
               onNudge: _nudge,
               onOpenMyStats: _openMyStats,
+              onOpenFriendsStats: _openFriendsStats,
             ),
             NudgeScreen(key: _nudgeKey, initialRecipient: _nudgeRecipient),
             PrivacyScreen(sharing: _services.sharing),
@@ -158,11 +172,13 @@ class _CircleHome extends StatelessWidget {
     required this.onOpenMember,
     required this.onNudge,
     required this.onOpenMyStats,
+    required this.onOpenFriendsStats,
   });
 
   final CircleFamily family;
   final VoidCallback onSwitchFamily;
   final VoidCallback onOpenMyStats;
+  final VoidCallback onOpenFriendsStats;
   final ValueChanged<CircleMember> onOpenMember;
   final ValueChanged<CircleMember> onNudge;
 
@@ -179,7 +195,17 @@ class _CircleHome extends StatelessWidget {
           const SizedBox(height: 14),
           _TogetherToday(steps: family.stepsToday, goal: family.stepsGoal),
           const SizedBox(height: 14),
-          _MyStatsLink(onTap: onOpenMyStats),
+          _CircleLink(
+            icon: Icons.sync_rounded,
+            label: 'My stats and health sync',
+            onTap: onOpenMyStats,
+          ),
+          const SizedBox(height: 8),
+          _CircleLink(
+            icon: Icons.group_rounded,
+            label: "Friends' stats",
+            onTap: onOpenFriendsStats,
+          ),
           if (family.listMembers.isEmpty) ...[
             const SizedBox(height: 14),
             _EmptyFamily(name: family.name),
@@ -202,9 +228,15 @@ class _CircleHome extends StatelessWidget {
 // HEADER — circle switcher + notifications
 // ---------------------------------------------------------------------------
 
-class _MyStatsLink extends StatelessWidget {
-  const _MyStatsLink({required this.onTap});
+class _CircleLink extends StatelessWidget {
+  const _CircleLink({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
+  final IconData icon;
+  final String label;
   final VoidCallback onTap;
 
   @override
@@ -218,23 +250,26 @@ class _MyStatsLink extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(Icons.sync_rounded, size: 20, color: CircleColors.ink),
-              SizedBox(width: 12),
+              Icon(icon, size: 20, color: CircleColors.ink),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'My stats and health sync',
-                  style: TextStyle(
+                  label,
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: CircleColors.ink,
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: CircleColors.muted),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: CircleColors.muted,
+              ),
             ],
           ),
         ),

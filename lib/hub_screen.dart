@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_services.dart';
 import 'screens/circles_screen.dart';
+import 'screens/friends_stats_screen.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/my_stats_screen.dart';
 import 'theme/app_colors.dart';
@@ -35,6 +36,12 @@ class _HubItem {
 Widget _myStats(AppServices s) =>
     MyStatsScreen(friends: s.friends, stats: s.stats);
 
+Widget _friendsStats(AppServices s) => FriendsStatsScreen(
+  friends: s.friends,
+  stats: s.stats,
+  sharing: s.sharing,
+);
+
 Widget _leaderboard(AppServices s) =>
     LeaderboardScreen(friends: s.friends, stats: s.stats, sharing: s.sharing);
 
@@ -56,6 +63,7 @@ const _hubItems = [
     subtitle: 'See how your friends are doing',
     color: AppColors.blue,
     edgeColor: AppColors.blueDark,
+    screen: _friendsStats,
   ),
   _HubItem(
     icon: Icons.emoji_events_rounded,
