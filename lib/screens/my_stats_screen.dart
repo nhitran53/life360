@@ -13,6 +13,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/stat_colors.dart';
 import '../utils/format.dart';
+import '../widgets/badge_row.dart';
 import '../widgets/chunky.dart';
 
 // ---------------------------------------------------------------------------
@@ -48,6 +49,7 @@ class _MyStatsData {
     required this.week,
     required this.streak,
     required this.weekXp,
+    required this.badges,
   });
 
   /// Null when nothing has synced today.
@@ -57,6 +59,7 @@ class _MyStatsData {
   final List<DailyStats> week;
   final int streak;
   final int weekXp;
+  final List<RewardBadge> badges;
 }
 
 class _MyStatsScreenState extends State<MyStatsScreen> {
@@ -101,6 +104,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
       week: week.days,
       streak: currentStreak(recent, today: today, goals: goals),
       weekXp: weeklyXp(week),
+      badges: earnedBadges(recent, goals: goals),
     );
   }
 
@@ -159,6 +163,11 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                   const SizedBox(height: 16),
                 ],
                 _HeaderChips(streak: data.streak, weekXp: data.weekXp),
+                const SizedBox(height: 12),
+                BadgeRow(
+                  key: const ValueKey('badge-row'),
+                  badges: data.badges,
+                ),
                 const SizedBox(height: 16),
                 _ViewToggle(
                   selected: _view,

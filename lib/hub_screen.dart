@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_services.dart';
+import 'screens/circles_screen.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/my_stats_screen.dart';
 import 'theme/app_colors.dart';
@@ -37,6 +38,9 @@ Widget _myStats(AppServices s) =>
 Widget _leaderboard(AppServices s) =>
     LeaderboardScreen(friends: s.friends, stats: s.stats);
 
+Widget _circles(AppServices s) =>
+    CirclesScreen(circles: s.circles, friends: s.friends, stats: s.stats);
+
 const _hubItems = [
   _HubItem(
     icon: Icons.insights_rounded,
@@ -60,6 +64,14 @@ const _hubItems = [
     color: AppColors.gold,
     edgeColor: AppColors.goldDark,
     screen: _leaderboard,
+  ),
+  _HubItem(
+    icon: Icons.groups_rounded,
+    title: 'Circles',
+    subtitle: 'Your groups and weekly rewards',
+    color: AppColors.orange,
+    edgeColor: AppColors.orangeDark,
+    screen: _circles,
   ),
 ];
 
