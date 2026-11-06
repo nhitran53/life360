@@ -164,19 +164,22 @@ void main() {
                         (w) => w is CircleSvg && w.name == 'switch_$state');
 
                 expect(find.text('Sharing & privacy'), findsOneWidget);
-                // Heart rate, steps and active minutes on; sleep private.
+                // Steps, workouts and calories on; sleep and screen time
+                // private by default.
                 expect(switches('on'), findsNWidgets(3));
-                expect(switches('off'), findsOneWidget);
+                expect(switches('off'), findsNWidgets(2));
 
                 await tester.ensureVisible(find.text('Sleep'));
                 await tester.tap(find.text('Sleep'));
                 await tester.pump();
                 expect(switches('on'), findsNWidgets(4));
-                expect(switches('off'), findsNothing);
+                expect(switches('off'), findsOneWidget);
 
                 await tester.ensureVisible(find.text('Pause for 24 h'));
                 await tester.tap(find.text('Pause for 24 h'));
                 await tester.pump();
+                expect(find.text('Paused: friends see none of your stats for now 🔒'),
+                    findsOneWidget);
                 expect(find.text('Resume sharing'), findsOneWidget);
           });
 
