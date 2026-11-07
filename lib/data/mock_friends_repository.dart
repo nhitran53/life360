@@ -50,6 +50,25 @@ class MockFriendsRepository implements FriendsRepository {
       .toList();
 
   @override
+  Future<List<Friendship>> outgoingRequests() async => _friendships
+      .where((f) => f.status == FriendshipStatus.pending && f.requesterId == _me)
+      .toList();
+
+  @override
+  Future<List<UserProfile>> searchUsers(String query) async {
+    var q = query.trim().toLowerCase();
+    if (q.startsWith('@')) q = q.substring(1);
+    if (q.length < 2) return const [];
+    return mockAllUsers
+        .where((u) =>
+            u.id != _me &&
+            (u.username.toLowerCase().contains(q) ||
+                u.displayName.toLowerCase().contains(q)))
+        .toList()
+      ..sort((a, b) => a.displayName.compareTo(b.displayName));
+  }
+
+  @override
   Future<UserProfile?> findByFriendCode(String code) async {
     final wanted = code.trim().toUpperCase();
     for (final u in mockAllUsers) {
@@ -108,5 +127,29 @@ class MockFriendsRepository implements FriendsRepository {
     _friendships[i] = _friendships[i].copyWith(
       status: accept ? FriendshipStatus.accepted : FriendshipStatus.declined,
     );
+  }
+
+  @override
+  Future<void> cancelRequest(String friendshipId) async {
+    final removed = _removeWhere((f) =>
+        f.id == friendshipId &&
+        f.requesterId == _me &&
+        f.status == FriendshipStatus.pending);
+    if (!removed) throw const FriendRequestException('Request not found');
+  }
+
+  @override
+  Future<void> removeFriend(String userId) async {
+    final removed = _removeWhere((f) =>
+        f.involves(_me) &&
+        f.involves(userId) &&
+        f.status == FriendshipStatus.accepted);
+    if (!removed) throw const FriendRequestException("You're not friends");
+  }
+
+  bool _removeWhere(bool Function(Friendship) test) {
+    final before = _friendships.length;
+    _friendships.removeWhere(test);
+    return _friendships.length < before;
   }
 }

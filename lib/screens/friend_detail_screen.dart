@@ -86,7 +86,9 @@ class _FriendDetailScreenState extends State<FriendDetailScreen> {
                     label: 'Retry',
                     icon: Icons.refresh,
                     expand: false,
-                    onPressed: () => setState(() => _data = _load()),
+                    onPressed: () => setState(() {
+                      _data = _load();
+                    }),
                   ),
                 ),
               );

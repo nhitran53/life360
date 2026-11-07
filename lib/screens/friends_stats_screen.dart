@@ -14,6 +14,7 @@ import '../theme/app_colors.dart';
 import '../utils/format.dart';
 import '../widgets/chunky.dart';
 import '../widgets/friend_widgets.dart';
+import 'add_friends_screen.dart';
 import 'friend_detail_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -45,10 +46,17 @@ class FriendsStatsScreen extends StatefulWidget {
 }
 
 class _FriendsData {
-  const _FriendsData({required this.myWeek, required this.friends});
+  const _FriendsData({
+    required this.myWeek,
+    required this.friends,
+    required this.requests,
+  });
 
   final WeeklySummary myWeek;
   final List<FriendSnapshot> friends;
+
+  /// Friend requests waiting for you, for the badge on Add friends.
+  final int requests;
 }
 
 class _FriendsStatsScreenState extends State<FriendsStatsScreen> {
@@ -92,7 +100,21 @@ class _FriendsStatsScreenState extends State<FriendsStatsScreen> {
       for (final f in friends)
         loadFriendSnapshot(f, stats: stats, sharing: sharing, now: now),
     ]);
-    return _FriendsData(myWeek: myWeek, friends: snapshots);
+    final requests = (await _friends.incomingRequests()).length;
+    return _FriendsData(myWeek: myWeek, friends: snapshots, requests: requests);
+  }
+
+  Future<void> _openAddFriends() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AddFriendsScreen(friends: _friends),
+      ),
+    );
+    // Friends may have been added, accepted or removed.
+    if (!mounted) return;
+    setState(() {
+      _data = _load();
+    });
   }
 
   void _open(FriendSnapshot friend) {
@@ -114,7 +136,31 @@ class _FriendsStatsScreenState extends State<FriendsStatsScreen> {
     final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Friends' Stats")),
+      appBar: AppBar(
+        title: const Text("Friends' Stats"),
+        actions: [
+          FutureBuilder<_FriendsData>(
+            future: _data,
+            builder: (context, snapshot) {
+              final requests = snapshot.data?.requests ?? 0;
+              return IconButton(
+                key: const ValueKey('add-friends'),
+                tooltip: requests == 0
+                    ? 'Add friends'
+                    : 'Add friends, $requests new '
+                          '${requests == 1 ? 'request' : 'requests'}',
+                onPressed: _openAddFriends,
+                icon: Badge(
+                  isLabelVisible: requests > 0,
+                  label: Text('$requests'),
+                  child: const Icon(Icons.person_add_alt_1_rounded),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: FutureBuilder<_FriendsData>(
@@ -124,15 +170,19 @@ class _FriendsStatsScreenState extends State<FriendsStatsScreen> {
             if (snapshot.hasError) {
               return _Message(
                 text: "Couldn't load your friends' stats. Try again in a sec.",
-                onRetry: () => setState(() => _data = _load()),
+                onRetry: () => setState(() {
+                  _data = _load();
+                }),
               );
             }
             if (data == null) {
               return const Center(child: CircularProgressIndicator());
             }
             if (data.friends.isEmpty) {
-              return const _Message(
+              return _Message(
                 text: 'Add friends to see how they’re doing 👋',
+                actionLabel: 'Add friends',
+                onAction: _openAddFriends,
               );
             }
             return ListView(
@@ -256,10 +306,17 @@ class _FriendCard extends StatelessWidget {
 }
 
 class _Message extends StatelessWidget {
-  const _Message({required this.text, this.onRetry});
+  const _Message({
+    required this.text,
+    this.onRetry,
+    this.actionLabel,
+    this.onAction,
+  });
 
   final String text;
   final VoidCallback? onRetry;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -275,6 +332,15 @@ class _Message extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: AppColors.inkSoft),
             ),
+            if (actionLabel != null) ...[
+              const SizedBox(height: 16),
+              ChunkyButton(
+                label: actionLabel!,
+                icon: Icons.person_add_alt_1_rounded,
+                onPressed: onAction,
+                expand: false,
+              ),
+            ],
             if (onRetry != null) ...[
               const SizedBox(height: 16),
               ChunkyButton(
