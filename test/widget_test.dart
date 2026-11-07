@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:life360/data/family_store.dart';
 import 'package:life360/hub_screen.dart';
+import 'package:life360/screens/friends_stats_screen.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
 import 'package:life360/screens/leaderboard_screen.dart';
@@ -305,16 +306,31 @@ void main() {
                 expect(find.text('All friends'), findsOneWidget);
           });
 
-      testWidgets("Friends' Stats hub card opens the coming soon page",
+      testWidgets("Friends' Stats hub card opens the Friends' Stats screen",
               (WidgetTester tester) async {
                 await tester.pumpWidget(const MaterialApp(home: HubScreen()));
                 await tester.pump(const Duration(seconds: 2));
 
                 await tester.tap(find.text("Friends' Stats"));
-                await tester.pump();
-                await tester.pump(const Duration(seconds: 1));
+                await tester.pumpAndSettle();
 
-                expect(find.text('Coming soon 👀'), findsOneWidget);
+                expect(find.byType(FriendsStatsScreen), findsOneWidget);
+                expect(find.text('Coming soon 👀'), findsNothing);
+          });
+
+      testWidgets("Circle home links to Friends' Stats",
+              (WidgetTester tester) async {
+                useTallPhone(tester);
+                await tester.pumpWidget(
+                    const MaterialApp(home: CircleScreen()));
+                await tester.pump();
+
+                await tester.ensureVisible(find.text("Friends' stats"));
+                await tester.tap(find.text("Friends' stats"));
+                await tester.pumpAndSettle();
+
+                expect(find.byType(FriendsStatsScreen), findsOneWidget);
+                expect(find.text("How's everyone doing?"), findsOneWidget);
           });
 
       testWidgets('My Stats hub card opens the My Stats screen',
