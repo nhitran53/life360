@@ -7,6 +7,7 @@ import '../data/friends_repository.dart';
 import '../data/health/health_source.dart';
 import '../data/mock_friends_repository.dart';
 import '../data/mock_stats_repository.dart';
+import '../data/screen_time_log.dart';
 import '../data/stats_repository.dart';
 import '../models/models.dart';
 import '../theme/app_colors.dart';
@@ -29,6 +30,7 @@ class MyStatsScreen extends StatefulWidget {
     this.stats,
     this.clock,
     this.goals = const DailyGoals(),
+    this.screenTimeLog,
   });
 
   /// Defaults to mock repositories until the backend exists. When [stats] is a
@@ -38,6 +40,11 @@ class MyStatsScreen extends StatefulWidget {
   final StatsRepository? stats;
   final DateTime Function()? clock;
   final DailyGoals goals;
+
+  /// Where to save screen time the user logs by hand. When set, Today shows
+  /// a button to log it. [stats] should merge these entries back in (see
+  /// `ManualScreenTimeRepository`), or the logged value won't show.
+  final ScreenTimeLog? screenTimeLog;
 
   @override
   State<MyStatsScreen> createState() => _MyStatsScreenState();
@@ -57,7 +64,7 @@ class _MyStatsData {
 
   /// This week's tracked days, Monday first.
   final List<DailyStats> week;
-  final int streak;
+  final StreakStatus streak;
   final int weekXp;
   final List<RewardBadge> badges;
 }
@@ -102,7 +109,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
     return _MyStatsData(
       today: recent.where((d) => d.date == today).firstOrNull,
       week: week.days,
-      streak: currentStreak(recent, today: today, goals: goals),
+      streak: streakWithFreezes(recent, today: today, goals: goals),
       weekXp: weeklyXp(week),
       badges: earnedBadges(recent, goals: goals),
     );
@@ -125,9 +132,43 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
     });
   }
 
+  /// Opens the screen time sheet, then saves and reloads.
+  Future<void> _logScreenTime(ScreenTimeLog log, int current) async {
+    final day = dateOnly(_clock());
+    final minutes = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _ScreenTimeSheet(initial: current),
+    );
+    if (minutes == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await log.setMinutes(day, minutes);
+    } catch (_) {
+      // Never surface the error text: it could carry health details.
+      messenger.showSnackBar(
+        const SnackBar(content: Text("Couldn't save that. Try again.")),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _data = _load();
+    });
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          minutes == 0 ? 'Screen time cleared' : 'Screen time logged 📱',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final connectable = _connectable;
+    final log = widget.screenTimeLog;
     final denied = connectable?.deniedMetrics ?? const <StatMetric>{};
     return Scaffold(
       appBar: AppBar(title: const Text('My Stats')),
@@ -162,12 +203,11 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                _HeaderChips(streak: data.streak, weekXp: data.weekXp),
+                _HeaderChips(streak: data.streak.days, weekXp: data.weekXp),
+                const SizedBox(height: 10),
+                _FreezeLine(streak: data.streak),
                 const SizedBox(height: 12),
-                BadgeRow(
-                  key: const ValueKey('badge-row'),
-                  badges: data.badges,
-                ),
+                BadgeRow(key: const ValueKey('badge-row'), badges: data.badges),
                 const SizedBox(height: 16),
                 _ViewToggle(
                   selected: _view,
@@ -182,6 +222,12 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                       today: data.today,
                       goals: widget.goals,
                       denied: denied,
+                      onLogScreenTime: log == null
+                          ? null
+                          : () => _logScreenTime(
+                              log,
+                              data.today?.screenTimeMinutes ?? 0,
+                            ),
                     ),
                     MyStatsView.week => _WeekView(
                       key: const ValueKey('week'),
@@ -319,6 +365,32 @@ class _HeaderChip extends StatelessWidget {
   }
 }
 
+/// Streak freezes banked, and when one last saved the streak.
+class _FreezeLine extends StatelessWidget {
+  const _FreezeLine({required this.streak});
+
+  final StreakStatus streak;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = freezeLine(streak, MaterialLocalizations.of(context));
+    return Row(
+      key: const ValueKey('freeze-line'),
+      children: [
+        Icon(Icons.ac_unit_rounded, size: 18, color: AppColors.blue),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: AppColors.inkSoft),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // TODAY / THIS WEEK toggle
 // ---------------------------------------------------------------------------
@@ -384,6 +456,7 @@ class _TodayView extends StatelessWidget {
     required this.today,
     required this.goals,
     required this.denied,
+    this.onLogScreenTime,
   });
 
   final DailyStats? today;
@@ -392,12 +465,22 @@ class _TodayView extends StatelessWidget {
   /// Metrics the user turned down in their health app.
   final Set<StatMetric> denied;
 
+  /// Null hides the button to log screen time by hand.
+  final VoidCallback? onLogScreenTime;
+
   @override
   Widget build(BuildContext context) {
     final today = this.today;
+    final onLog = onLogScreenTime;
     if (today == null) {
-      return const _Message(
-        text: 'Nothing synced yet today. Go for a walk and check back! 👟',
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _Message(
+            text: 'Nothing synced yet today. Go for a walk and check back! 👟',
+          ),
+          if (onLog != null) _LogScreenTimeButton(logged: false, onTap: onLog),
+        ],
       );
     }
 
@@ -416,9 +499,135 @@ class _TodayView extends StatelessWidget {
             goals: goals,
             denied: denied.contains(metric),
           ),
+          if (metric == StatMetric.screenTime && onLog != null) ...[
+            const SizedBox(height: 8),
+            _LogScreenTimeButton(
+              logged: today.screenTimeMinutes > 0,
+              onTap: onLog,
+            ),
+          ],
           const SizedBox(height: 12),
         ],
       ],
+    );
+  }
+}
+
+class _LogScreenTimeButton extends StatelessWidget {
+  const _LogScreenTimeButton({required this.logged, required this.onTap});
+
+  final bool logged;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ChunkyButton.secondary(
+    key: const ValueKey('log-screen-time'),
+    label: logged ? 'Edit screen time' : 'Log screen time',
+    icon: Icons.edit_rounded,
+    onPressed: onTap,
+  );
+}
+
+/// Bottom sheet to type in today's screen time in 15-minute steps.
+/// Pops the chosen minutes, 0 to clear, or nothing when dismissed.
+class _ScreenTimeSheet extends StatefulWidget {
+  const _ScreenTimeSheet({required this.initial});
+
+  final int initial;
+
+  @override
+  State<_ScreenTimeSheet> createState() => _ScreenTimeSheetState();
+}
+
+class _ScreenTimeSheetState extends State<_ScreenTimeSheet> {
+  static const _step = 15;
+
+  /// A sensible starting point when nothing is logged yet.
+  static const _startAt = 2 * 60;
+
+  late int _minutes = widget.initial > 0 ? widget.initial : _startAt;
+
+  void _add(int delta) => setState(() {
+    _minutes = (_minutes + delta).clamp(0, ScreenTimeLog.maxMinutes);
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final metric = StatMetric.screenTime;
+    Widget step(String key, String label, int delta) => Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ChunkyButton.secondary(
+          key: ValueKey(key),
+          label: label,
+          onPressed: () => _add(delta),
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        24 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        key: const ValueKey('screen-time-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '${metric.emoji} Screen time today',
+            style: text.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Check your phone settings and round to the nearest 15 min. '
+            'Only you see this unless you share it.',
+            style: text.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              formatMinutes(_minutes),
+              key: const ValueKey('screen-time-value'),
+              textAlign: TextAlign.center,
+              style: text.displaySmall?.copyWith(color: metric.color),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              step('screen-time-minus-hour', '−1h', -60),
+              step('screen-time-minus', '−15m', -_step),
+              step('screen-time-plus', '+15m', _step),
+              step('screen-time-plus-hour', '+1h', 60),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ChunkyButton(
+            key: const ValueKey('screen-time-save'),
+            label: 'Save',
+            icon: Icons.check_rounded,
+            color: metric.color,
+            edgeColor: metric.edgeColor,
+            onPressed: () => Navigator.of(context).pop(_minutes),
+          ),
+          if (widget.initial > 0) ...[
+            const SizedBox(height: 8),
+            ChunkyButton.secondary(
+              key: const ValueKey('screen-time-clear'),
+              label: 'Clear for today',
+              onPressed: () => Navigator.of(context).pop(0),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -988,6 +1197,21 @@ String goalStatus(StatMetric metric, int value, DailyGoals goals) {
     StatMetric.calories => '${formatThousands(gap)} kcal to go 🔥',
     StatMetric.screenTime => '', // handled above
   };
+}
+
+/// The line under the streak chip about streak freezes.
+String freezeLine(StreakStatus streak, MaterialLocalizations l10n) {
+  final saved = streak.frozenDays.lastOrNull;
+  final savedText = saved == null
+      ? ''
+      : ' A freeze saved your streak on ${l10n.formatShortMonthDay(saved)} 🧊';
+  if (streak.freezesLeft > 0) {
+    final n = streak.freezesLeft;
+    return '$n streak ${n == 1 ? 'freeze' : 'freezes'} ready.$savedText';
+  }
+  if (saved != null) return savedText.trim();
+  return 'Keep a ${StreakFreezeRules.daysPerFreeze}-day streak to earn a '
+      'streak freeze 🧊';
 }
 
 /// The headline above the Today cards.

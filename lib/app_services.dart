@@ -10,23 +10,32 @@ import 'data/health_stats_repository.dart';
 import 'data/mock_circle_repository.dart';
 import 'data/mock_data.dart';
 import 'data/mock_friends_repository.dart';
+import 'data/manual_screen_time_repository.dart';
 import 'data/mock_stats_repository.dart';
+import 'data/screen_time_log.dart';
 import 'data/sharing_repository.dart';
 import 'data/sharing_stats_repository.dart';
 
 /// The app's repositories, created once and passed down to screens.
 class AppServices {
-  /// [stats] is wrapped so friends only ever see what each person shares.
+  /// [stats] gets the current user's logged screen time merged in, then is
+  /// wrapped so friends only ever see what each person shares.
   AppServices({
     required this.friends,
     required ConnectableStatsRepository stats,
     CircleRepository? circles,
     SharingRepository? sharing,
+    ScreenTimeLog? screenTime,
   })  : circles = circles ?? MockCircleRepository(),
         sharing = sharing ?? MockSharingRepository(),
-        rawStats = stats {
-    this.stats = SharingStatsRepository(
+        screenTime = screenTime ?? InMemoryScreenTimeLog() {
+    rawStats = ManualScreenTimeRepository(
       inner: stats,
+      friends: friends,
+      log: this.screenTime,
+    );
+    this.stats = SharingStatsRepository(
+      inner: rawStats,
       friends: friends,
       sharing: this.sharing,
     );
@@ -61,8 +70,12 @@ class AppServices {
   /// Stats with everyone's sharing settings applied. Screens use this.
   late final ConnectableStatsRepository stats;
 
-  /// The unfiltered repository, for tests and the backend sync later.
-  final ConnectableStatsRepository rawStats;
+  /// The unfiltered repository (logged screen time included), for tests and
+  /// the backend sync later.
+  late final ConnectableStatsRepository rawStats;
+
+  /// Screen time the user logs by hand. My Stats writes to it.
+  final ScreenTimeLog screenTime;
 
   final CircleRepository circles;
 

@@ -130,6 +130,34 @@ void main() {
       expect(earnedBadges(dup), isNot(contains(RewardBadge.workoutWeek)));
     });
 
+    test('Ten-K club needs 10,000 steps in one day', () {
+      expect(
+        earnedBadges([day(d(0), steps: 9999)]),
+        isNot(contains(RewardBadge.tenKDay)),
+      );
+      expect(
+        earnedBadges([day(d(0), steps: 10000)]),
+        contains(RewardBadge.tenKDay),
+      );
+    });
+
+    test('Power hour needs 60 workout minutes in one day', () {
+      expect(
+        earnedBadges([day(d(0), workout: 59)]),
+        isNot(contains(RewardBadge.powerHour)),
+      );
+      expect(
+        earnedBadges([day(d(0), workout: 60)]),
+        contains(RewardBadge.powerHour),
+      );
+    });
+
+    test('badge thresholds ignore personal goals', () {
+      const easy = DailyGoals(steps: 100, workoutMinutes: 5);
+      final days = [day(d(0), steps: 500, workout: 10)];
+      expect(earnedBadges(days, goals: easy), [RewardBadge.firstActiveDay]);
+    });
+
     test('sleep alone earns nothing', () {
       expect(earnedBadges([day(d(0), sleep: 600)]), isEmpty);
     });

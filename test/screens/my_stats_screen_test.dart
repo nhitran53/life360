@@ -74,10 +74,10 @@ void main() {
     await pumpScreen(tester);
     final recent = await stats.dailyStats(
       mockMe.id,
-      from: now.subtract(const Duration(days: 30)),
+      from: DateTime(now.year, now.month, now.day - 60),
       to: now,
     );
-    final streak = currentStreak(recent, today: now);
+    final streak = streakWithFreezes(recent, today: now).days;
     final xp = weeklyXp(await stats.weeklySummary(mockMe.id, weekOf: now));
 
     expect(find.bySemanticsLabel('$streak day streak'), findsOneWidget);
