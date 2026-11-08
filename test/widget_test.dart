@@ -84,6 +84,10 @@ void main() {
 
                 expect(find.byType(MyStatsScreen), findsOneWidget);
                 expect(find.byKey(const ValueKey('connect-button')), findsOneWidget);
+                // The app's services hand My Stats a place to log screen time.
+                final myStats =
+                    tester.widget<MyStatsScreen>(find.byType(MyStatsScreen));
+                expect(myStats.screenTimeLog, isNotNull);
           });
 
       testWidgets('Nudging Dad opens the nudge tab and sends',

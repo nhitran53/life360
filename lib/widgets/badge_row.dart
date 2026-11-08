@@ -12,6 +12,8 @@ extension RewardBadgeEmoji on RewardBadge {
     RewardBadge.threeDayStreak => '🔥',
     RewardBadge.sevenDayStreak => '🏅',
     RewardBadge.workoutWeek => '💪',
+    RewardBadge.tenKDay => '🚶',
+    RewardBadge.powerHour => '⏱️',
   };
 }
 

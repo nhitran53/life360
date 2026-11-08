@@ -96,7 +96,11 @@ class _CircleScreenState extends State<CircleScreen> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
-            MyStatsScreen(friends: _services.friends, stats: _services.stats),
+            MyStatsScreen(
+              friends: _services.friends,
+              stats: _services.stats,
+              screenTimeLog: _services.screenTime,
+            ),
       ),
     );
   }

@@ -34,7 +34,11 @@ class _HubItem {
 }
 
 Widget _myStats(AppServices s) =>
-    MyStatsScreen(friends: s.friends, stats: s.stats);
+    MyStatsScreen(
+      friends: s.friends,
+      stats: s.stats,
+      screenTimeLog: s.screenTime,
+    );
 
 Widget _friendsStats(AppServices s) => FriendsStatsScreen(
   friends: s.friends,

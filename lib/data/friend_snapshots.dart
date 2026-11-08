@@ -37,7 +37,7 @@ Future<FriendSnapshot> loadFriendSnapshot(
     user: friend,
     today: recent.where((d) => d.date == today).firstOrNull,
     week: week,
-    streak: streakVisible ? currentStreak(recent, today: today) : null,
+    streak: streakVisible ? streakWithFreezes(recent, today: today).days : null,
     hidden: hidden,
   );
 }

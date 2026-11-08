@@ -12,6 +12,7 @@ export 'leaderboard_entry.dart';
 export 'stat_metric.dart';
 export 'rewards.dart';
 export 'sharing_settings.dart';
+export 'streak_freeze.dart';
 export 'user_profile.dart';
 export 'weekly_summary.dart';
 export 'xp.dart';

@@ -54,12 +54,21 @@ enum RewardBadge {
   firstActiveDay('First step', 'Hit a daily steps or workout goal'),
   threeDayStreak('On a roll', '3 active days in a row'),
   sevenDayStreak('Full week', '7 active days in a row'),
-  workoutWeek('Workout week', 'Hit your workout goal 3 days in one week');
+  workoutWeek('Workout week', 'Hit your workout goal 3 days in one week'),
+  tenKDay('Ten-K club', 'Walk 10,000 steps in one day'),
+  powerHour('Power hour', 'Work out for 60 minutes in one day');
 
   const RewardBadge(this.title, this.description);
 
   final String title;
   final String description;
+}
+
+/// Thresholds for the single-day badges. Fixed, so they mean the same thing
+/// for everyone no matter what goals they set.
+abstract final class BadgeRules {
+  static const tenKSteps = 10000;
+  static const powerHourMinutes = 60;
 }
 
 /// The badges earned by [days], in enum order.
@@ -83,5 +92,8 @@ List<RewardBadge> earnedBadges(
     if (streak >= 7) RewardBadge.sevenDayStreak,
     if (workoutDaysByWeek.values.any((days) => days.length >= 3))
       RewardBadge.workoutWeek,
+    if (list.any((d) => d.steps >= BadgeRules.tenKSteps)) RewardBadge.tenKDay,
+    if (list.any((d) => d.workoutMinutes >= BadgeRules.powerHourMinutes))
+      RewardBadge.powerHour,
   ];
 }
