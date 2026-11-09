@@ -268,6 +268,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(source.requestPermissionsCalls, 0);
       expect(find.text('Sync now'), findsOneWidget);
       expect(find.text('Connect Health Connect'), findsNothing);
       expect(find.text('Health Connect connected'), findsOneWidget);

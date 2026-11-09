@@ -66,13 +66,20 @@ class HealthStatsRepository implements ConnectableStatsRepository {
   /// Also the manual re-sync: it re-checks permissions, which the user may
   /// have changed in the system settings, and stamps [lastSyncedAt].
   @override
-  Future<bool> connect() async {
+  Future<bool> connect() => _sync(_source.requestPermissions);
+
+  /// Shared by [connect] and restore: checks availability, then reads
+  /// permissions through [permissions] (the only difference between the two:
+  /// connect may prompt, restore never does).
+  Future<bool> _sync(
+    Future<HealthPermissionResult> Function() permissions,
+  ) async {
     _availability = await _source.availability();
     if (_availability != HealthAvailability.available) {
       _permissions = null;
       _connected = false;
     } else {
-      _permissions = await _source.requestPermissions();
+      _permissions = await permissions();
       _connected = _permissions!.anyReadable;
       if (_connected) _lastSyncedAt = _clock();
     }
@@ -80,10 +87,13 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     return _connected;
   }
 
-  /// On launch: if the user connected last time, connects again (re-checking
-  /// availability and permissions, which may have changed since) so the UI
-  /// starts on Sync instead of Connect. Does nothing when they never
-  /// connected or disconnected. Runs once; later calls share the first.
+  /// On launch: if the user connected last time, re-checks availability and
+  /// the current permissions (which may have changed since) so the UI starts
+  /// on Sync instead of Connect. Never asks for permission: only [connect]
+  /// may show the system dialog. If all access is gone the saved flag is
+  /// cleared; if some is gone those metrics show as [deniedMetrics]. Does
+  /// nothing when they never connected or disconnected. Runs once; later
+  /// calls share the first.
   ///
   /// Never throws. If the source fails, the repository stays disconnected
   /// but the saved flag is kept so the next launch tries again.
@@ -93,7 +103,7 @@ class HealthStatsRepository implements ConnectableStatsRepository {
   Future<void> _restore() async {
     try {
       if (_connected || !await _store.loadConnected()) return;
-      await connect();
+      await _sync(_source.checkPermissions);
     } catch (_) {
       // Never surface the error text: it could carry health details.
     }

@@ -49,6 +49,9 @@ class TakeoutHealthSource implements HealthSource {
       });
 
   @override
+  Future<HealthPermissionResult> checkPermissions() => requestPermissions();
+
+  @override
   Future<List<DailyStats>> fetchDailyStats(
     String userId, {
     required DateTime from,

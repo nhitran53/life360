@@ -60,7 +60,8 @@ void main() {
       expect(restarted.isConnected, isTrue);
       expect(restarted.availability, HealthAvailability.available);
       expect(restarted.lastSyncedAt, isNotNull);
-      expect(source.requestPermissionsCalls, 1);
+      expect(source.checkPermissionsCalls, 1);
+      expect(source.requestPermissionsCalls, 0);
     });
 
     test('restoreConnection does nothing when never connected', () async {
@@ -77,7 +78,8 @@ void main() {
       final r = repo(source, InMemoryHealthConnectionStore(connected: true));
       await Future.wait([r.restoreConnection(), r.restoreConnection()]);
       await r.restoreConnection();
-      expect(source.requestPermissionsCalls, 1);
+      expect(source.checkPermissionsCalls, 1);
+      expect(source.requestPermissionsCalls, 0);
     });
 
     test('disconnect clears the saved flag and the connection', () async {
@@ -111,8 +113,62 @@ void main() {
         expect(r.isConnected, isFalse);
         expect(r.deniedMetrics, isNotEmpty);
         expect(await store.loadConnected(), isFalse);
+        expect(source.requestPermissionsCalls, 0);
       },
     );
+
+    test('partial revocation on restore marks only those denied and '
+        'never prompts', () async {
+      final store = InMemoryHealthConnectionStore(connected: true);
+      final source = FakeHealthSource(
+        permissionOutcome: {
+          StatMetric.steps: HealthPermissionStatus.granted,
+          StatMetric.sleep: HealthPermissionStatus.denied,
+          StatMetric.workout: HealthPermissionStatus.granted,
+          StatMetric.calories: HealthPermissionStatus.denied,
+        },
+      );
+      final r = repo(source, store);
+      await r.restoreConnection();
+      expect(r.isConnected, isTrue);
+      expect(r.deniedMetrics, {StatMetric.sleep, StatMetric.calories});
+      expect(await store.loadConnected(), isTrue);
+      expect(source.requestPermissionsCalls, 0);
+    });
+
+    test('iOS-style unknown reads stay connected on restore', () async {
+      final store = InMemoryHealthConnectionStore(connected: true);
+      final source = FakeHealthSource(
+        permissionOutcome: {
+          for (final m in [
+            StatMetric.steps,
+            StatMetric.sleep,
+            StatMetric.workout,
+            StatMetric.calories,
+          ])
+            m: HealthPermissionStatus.unknown,
+        },
+      );
+      final r = repo(source, store);
+      await r.restoreConnection();
+      expect(r.isConnected, isTrue);
+      expect(r.deniedMetrics, isEmpty);
+      expect(source.requestPermissionsCalls, 0);
+    });
+
+    test('a manual connect after a failed restore may prompt', () async {
+      final store = InMemoryHealthConnectionStore(connected: true);
+      final source = FakeHealthSource(
+        permissionOutcome: {
+          for (final m in StatMetric.values) m: HealthPermissionStatus.denied,
+        },
+      );
+      final r = repo(source, store);
+      await r.restoreConnection();
+      expect(source.requestPermissionsCalls, 0);
+      await r.connect();
+      expect(source.requestPermissionsCalls, 1);
+    });
 
     test('an unavailable platform on restore stays unavailable', () async {
       final store = InMemoryHealthConnectionStore(connected: true);
