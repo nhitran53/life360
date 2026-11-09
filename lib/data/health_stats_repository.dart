@@ -1,6 +1,7 @@
 import '../models/models.dart';
 import 'connectable_stats_repository.dart';
 import 'friends_repository.dart';
+import 'health/health_connection_store.dart';
 import 'health/health_source.dart';
 import 'stats_repository.dart';
 
@@ -15,14 +16,18 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     required this._source,
     required this._fallback,
     required this._friends,
+    HealthConnectionStore? store,
     DateTime Function()? clock,
-  }) : _clock = clock ?? DateTime.now;
+  }) : _store = store ?? InMemoryHealthConnectionStore(),
+       _clock = clock ?? DateTime.now;
 
   final HealthSource _source;
   final StatsRepository _fallback;
   final FriendsRepository _friends;
+  final HealthConnectionStore _store;
   final DateTime Function() _clock;
 
+  Future<void>? _restoring;
   bool _connected = false;
   HealthAvailability? _availability;
   HealthPermissionResult? _permissions;
@@ -65,12 +70,49 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     _availability = await _source.availability();
     if (_availability != HealthAvailability.available) {
       _permissions = null;
-      return _connected = false;
+      _connected = false;
+    } else {
+      _permissions = await _source.requestPermissions();
+      _connected = _permissions!.anyReadable;
+      if (_connected) _lastSyncedAt = _clock();
     }
-    _permissions = await _source.requestPermissions();
-    _connected = _permissions!.anyReadable;
-    if (_connected) _lastSyncedAt = _clock();
+    await _remember(_connected);
     return _connected;
+  }
+
+  /// On launch: if the user connected last time, connects again (re-checking
+  /// availability and permissions, which may have changed since) so the UI
+  /// starts on Sync instead of Connect. Does nothing when they never
+  /// connected or disconnected. Runs once; later calls share the first.
+  ///
+  /// Never throws. If the source fails, the repository stays disconnected
+  /// but the saved flag is kept so the next launch tries again.
+  @override
+  Future<void> restoreConnection() => _restoring ??= _restore();
+
+  Future<void> _restore() async {
+    try {
+      if (_connected || !await _store.loadConnected()) return;
+      await connect();
+    } catch (_) {
+      // Never surface the error text: it could carry health details.
+    }
+  }
+
+  /// Forgets the connection: stats fall back to the demo source and the next
+  /// launch will not reconnect.
+  Future<void> disconnect() async {
+    _connected = false;
+    _permissions = null;
+    _lastSyncedAt = null;
+    await _remember(false);
+  }
+
+  /// Persists the flag. A broken store must not break connecting.
+  Future<void> _remember(bool connected) async {
+    try {
+      await _store.saveConnected(connected);
+    } catch (_) {}
   }
 
   /// Sends the user to the store to install or update the health app.

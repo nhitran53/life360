@@ -53,6 +53,9 @@ class SharingStatsRepository implements ConnectableStatsRepository {
   Future<bool> connect() => inner.connect();
 
   @override
+  Future<void> restoreConnection() => inner.restoreConnection();
+
+  @override
   Future<void> openInstallPage() => inner.openInstallPage();
 
   // --- Stats ---

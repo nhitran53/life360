@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'data/circle_repository.dart';
 import 'data/connectable_stats_repository.dart';
 import 'data/friends_repository.dart';
 import 'data/health/fake_health_source.dart';
+import 'data/health/health_connection_store.dart';
 import 'data/health/health_package_source.dart';
 import 'data/health/health_source.dart';
 import 'data/health/takeout_health_source.dart';
@@ -64,14 +66,16 @@ class AppServices {
             stats: generateMockStats(today: DateTime.now())
                 .where((s) => s.userId == mockMe.id),
           );
-    return AppServices(
+    final health = HealthStatsRepository(
+      source: source,
+      fallback: mockStats,
       friends: friends,
-      stats: HealthStatsRepository(
-        source: source,
-        fallback: mockStats,
-        friends: friends,
-      ),
+      store: SharedPreferencesHealthConnectionStore(),
     );
+    // Reconnect in the background so other screens see health stats too;
+    // My Stats waits for the same (shared) future.
+    unawaited(health.restoreConnection());
+    return AppServices(friends: friends, stats: health);
   }
 
   final FriendsRepository friends;
