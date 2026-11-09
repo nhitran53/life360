@@ -37,12 +37,12 @@ void main() {
                 expect(find.text("Let's go"), findsOneWidget);
           });
 
-      testWidgets('Tapping the button goes to the circle home',
+      testWidgets('Tapping the button opens sign-up',
               (WidgetTester tester) async {
                 await tester.pumpWidget(const Friend360App());
                 await tester.pump(const Duration(seconds: 2));
 
-                // Circle home shouldn't be showing yet.
+                // Circle home shouldn't be showing: nobody is signed in.
                 expect(find.text('Together today'), findsNothing);
 
                 // Tap the button, then let the transition play.
@@ -50,9 +50,8 @@ void main() {
                 await tester.pump(); // start the navigation
                 await tester.pump(const Duration(seconds: 2));
 
-                expect(find.text('Tran family'), findsOneWidget);
-                expect(find.text('Together today'), findsOneWidget);
-                expect(find.text('Circle'), findsOneWidget);
+                expect(find.text('Create your account'), findsOneWidget);
+                expect(find.text('Together today'), findsNothing);
           });
 
       testWidgets('Circle home shows totals and members',

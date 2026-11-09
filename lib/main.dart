@@ -2,9 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'data/account_session.dart';
+import 'data/mock_auth_repository.dart';
+import 'data/mock_profile_repository.dart';
 import 'models/stat_metric.dart';
-import 'screens/circle_screen.dart';
+import 'screens/auth_gate.dart';
 import 'screens/privacy_policy_screen.dart';
+import 'screens/sign_in_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'theme/stat_colors.dart';
@@ -12,19 +16,43 @@ import 'widgets/chunky.dart';
 
 void main() => runApp(const Friend360App());
 
-class Friend360App extends StatelessWidget {
-  const Friend360App({super.key});
+class Friend360App extends StatefulWidget {
+  const Friend360App({super.key, this.session});
+
+  /// Defaults to in-memory mock accounts until Firebase is connected.
+  final AccountSession? session;
+
+  @override
+  State<Friend360App> createState() => _Friend360AppState();
+}
+
+class _Friend360AppState extends State<Friend360App> {
+  late final AccountSession _session = widget.session ??
+      (_ownSession = AccountSession(
+        auth: MockAuthRepository(),
+        profiles: MockProfileRepository(),
+      ));
+  AccountSession? _ownSession;
+
+  @override
+  void dispose() {
+    _ownSession?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Friend 360',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      home: const HomeScreen(),
-      routes: {
-        privacyPolicyRoute: (_) => const PrivacyPolicyScreen(),
-      },
+    return AccountScope(
+      session: _session,
+      child: MaterialApp(
+        title: 'Friend 360',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        home: const AuthGate(welcome: HomeScreen()),
+        routes: {
+          privacyPolicyRoute: (_) => const PrivacyPolicyScreen(),
+        },
+      ),
     );
   }
 }
@@ -62,9 +90,11 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  void _enterApp() {
+  void _openSignIn(SignInMode mode) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const CircleScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => SignInScreen(initialMode: mode),
+      ),
     );
   }
 
@@ -100,7 +130,15 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     const Spacer(flex: 2),
                     const SizedBox(height: 32),
-                    ChunkyButton(label: "Let's go", onPressed: _enterApp),
+                    ChunkyButton(
+                      label: "Let's go",
+                      onPressed: () => _openSignIn(SignInMode.signUp),
+                    ),
+                    const SizedBox(height: 12),
+                    ChunkyButton.secondary(
+                      label: 'I already have an account',
+                      onPressed: () => _openSignIn(SignInMode.logIn),
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'You choose which stats friends can see.',

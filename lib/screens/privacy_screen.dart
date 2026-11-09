@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../data/account_session.dart';
 import '../data/mock_data.dart';
 import '../data/sharing_repository.dart';
 import '../models/models.dart';
 import '../theme/circle_colors.dart';
+import 'account_screen.dart';
 import 'privacy_policy_screen.dart';
 import '../widgets/circle_widgets.dart';
 
@@ -181,6 +183,18 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
               ),
             ],
           ),
+          if (AccountScope.maybeOf(context) != null) ...[
+            const SizedBox(height: 10),
+            CirclePillButton(
+              label: 'Account',
+              height: 48,
+              fontSize: 14,
+              horizontalPadding: 16,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AccountScreen()),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           CirclePillButton(
             label: 'Privacy policy',

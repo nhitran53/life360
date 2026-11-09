@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../app_services.dart';
+import '../data/account_session.dart';
 import '../data/family_store.dart';
 import '../data/mock_circle.dart';
+import '../models/daily_goals.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
 import '../widgets/family_switcher.dart';
@@ -95,8 +97,12 @@ class _CircleScreenState extends State<CircleScreen> {
   void _openMyStats() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            MyStatsScreen(friends: _services.friends, stats: _services.stats),
+        builder: (_) => MyStatsScreen(
+          friends: _services.friends,
+          stats: _services.stats,
+          // Your own goals once you're signed in.
+          goals: AccountScope.maybeOf(context)?.goals ?? const DailyGoals(),
+        ),
       ),
     );
   }
