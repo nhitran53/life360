@@ -23,7 +23,18 @@ rules_version = '2';
 // at 20 or less. Deletes need no check (taking data down is always allowed).
 // Settings older than this check store pausedUntil as an ISO string; those
 // can't be compared, so writes stay rejected until the app converts it to a
-// timestamp on its next load.
+// timestamp on its next load. The app creates the default settings document
+// (hidden: sleep, screenTime; pausedUntil: null) on the first load, which the
+// settings create rule accepts, so a new user can publish without touching
+// the privacy screen.
+//
+// Reads are fenced the same way, but only for pausing: friends can't read
+// daily documents while the saved settings are paused (or unreadable), even
+// when removing the published days failed. The owner always can. Hiding one
+// metric can NOT be fenced on reads: a rule on a list query can't look at the
+// documents' keys. The app removes the key right after the change and keeps
+// retrying with backoff while that fails (StatsSync), but until it succeeds
+// accepted friends can still read the old value. That is the residual risk.
 //
 // Claims are only accepted together with the matching profile (same
 // transaction), so nobody can grab usernames or codes they don't use.
@@ -160,8 +171,10 @@ service cloud.firestore {
 
       // Limits match FirestoreStatsPublisher.maxValues. Keys are StatMetric names.
       match /daily/{day} {
-        // Queries on users/{uid}/daily are allowed to the same people.
-        allow read: if isMe(uid) || (signedIn() && areFriends(request.auth.uid, uid));
+        // Queries on users/{uid}/daily are allowed to the same people. Friends
+        // are also locked out while the saved settings are paused.
+        allow read: if isMe(uid)
+          || (signedIn() && areFriends(request.auth.uid, uid) && notPaused(savedSettings(uid)));
 
         allow create, update: if isMe(uid)
           && validDay(day)

@@ -39,6 +39,9 @@ void main() {
     expect(await published(), isEmpty);
 
     await sharing.load();
+    // A new user never opened the privacy screen: the rules need a saved
+    // settings document before they accept published days.
+    expect((await db.doc('users/u1/private/settings').get()).exists, isTrue);
     await sync.sync();
     expect(await published(), ['2026-03-12']);
   });
@@ -184,6 +187,91 @@ void main() {
     });
   });
 
+  group('a failed revoke is retried without a health sync', () {
+    late _FlakyPublisher flaky;
+    late StatsSync retrying;
+
+    Future<Map<String, dynamic>?> read() async =>
+        (await db.doc('users/u1/daily/2026-03-12').get()).data();
+
+    Future<void> until(bool Function() done) async {
+      for (var i = 0; i < 200 && !done(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+    }
+
+    setUp(() async {
+      flaky = _FlakyPublisher(db, clock: () => now);
+      retrying = StatsSync(
+        source: source,
+        sharing: sharing,
+        publisher: flaky,
+        userId: 'u1',
+        clock: () => now,
+        retryBase: const Duration(milliseconds: 40),
+      );
+      await sharing.update('u1', const SharingSettings(hidden: {}));
+      await retrying.sync();
+      expect((await read())!['steps'], 4000);
+      expect(retrying.revocationPending, isFalse);
+      source.connected = false; // health plays no part from here on
+      retrying.start();
+      addTearDown(retrying.dispose);
+      await pumpEventQueue(); // let the run started by start() finish
+    });
+
+    test('a saved hide whose cleanup failed is cleaned up later', () async {
+      flaky.failures = 2;
+      await sharing.update(
+        'u1',
+        const SharingSettings(hidden: {StatMetric.steps}),
+      );
+      await pumpEventQueue();
+      expect(retrying.revocationPending, isTrue);
+      expect((await read())!['steps'], 4000); // still readable for now
+
+      await until(() => !retrying.revocationPending);
+
+      expect(retrying.revocationPending, isFalse);
+      expect(flaky.calls, greaterThanOrEqualTo(3)); // two failures, then ok
+      expect((await read())!.containsKey('steps'), isFalse);
+    });
+
+    test('a saved pause whose batch failed is cleaned up later', () async {
+      flaky.failures = 1;
+      await sharing.update(
+        'u1',
+        const SharingSettings().withPause(now.add(const Duration(days: 1))),
+      );
+      await pumpEventQueue();
+      expect(retrying.revocationPending, isTrue);
+      expect(await published(), ['2026-03-12']);
+
+      await until(() => !retrying.revocationPending);
+
+      expect(await published(), isEmpty);
+    });
+
+    test('a failed settings load is retried', () async {
+      final late = _LateLoad();
+      final lateSync = StatsSync(
+        source: source,
+        sharing: late,
+        publisher: flaky,
+        userId: 'u1',
+        clock: () => now,
+        retryBase: const Duration(milliseconds: 40),
+      );
+      addTearDown(lateSync.dispose);
+      lateSync.start();
+      await pumpEventQueue();
+      expect(lateSync.revocationPending, isTrue);
+      late.canLoad = true;
+      await until(() => !lateSync.revocationPending);
+      expect(lateSync.revocationPending, isFalse);
+    });
+  });
+
   test(
     'picks up settings changed from another device before publishing',
     () async {
@@ -212,6 +300,41 @@ void main() {
       expect(data.containsKey('steps'), isFalse);
     },
   );
+}
+
+/// A publisher whose [revoke] fails [failures] times first.
+class _FlakyPublisher extends FirestoreStatsPublisher {
+  _FlakyPublisher(super.db, {super.clock}) : super(uid: 'u1');
+
+  var failures = 0;
+  var calls = 0;
+
+  @override
+  Future<void> revoke(SharingSettings settings) async {
+    calls++;
+    if (failures > 0) {
+      failures--;
+      throw StateError('daily query failed');
+    }
+    return super.revoke(settings);
+  }
+}
+
+/// Not loaded until [canLoad] is set and [refresh] runs.
+class _LateLoad extends MockSharingRepository {
+  var canLoad = false;
+  var _loaded = false;
+
+  @override
+  bool get isLoaded => _loaded;
+
+  @override
+  Future<void> refresh() async {
+    if (canLoad && !_loaded) {
+      _loaded = true;
+      notifyListeners();
+    }
+  }
 }
 
 class _NeverLoaded extends MockSharingRepository {
