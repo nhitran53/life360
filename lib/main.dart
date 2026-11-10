@@ -44,6 +44,7 @@ Future<AccountSession?> _firebaseSession() async {
     auth: FirebaseAuthRepository(),
     profiles: FirestoreProfileRepository(db),
     friendsFor: (me) => FirestoreFriendsRepository(db, me: me),
+    statsDb: db,
     sharingFor: (me) {
       final sharing = FirestoreSharingRepository(db, uid: me.id);
       unawaited(sharing.load());

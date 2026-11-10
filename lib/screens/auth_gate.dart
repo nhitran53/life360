@@ -36,12 +36,21 @@ class _AuthGateState extends State<AuthGate> {
     final id = session.profile?.id;
     if (_services == null || _servicesFor != id) {
       _servicesFor = id;
+      _services?.dispose();
       _services = AppServices.defaults(
         friends: session.friends,
         sharing: session.sharing,
+        statsDb: session.statsDb,
+        userId: id,
       );
     }
     return _services!;
+  }
+
+  @override
+  void dispose() {
+    _services?.dispose();
+    super.dispose();
   }
 
   @override
