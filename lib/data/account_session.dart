@@ -101,9 +101,18 @@ class AccountSession extends ChangeNotifier {
 
   /// Deletes the user's data, then the account itself (App Store rule:
   /// apps with accounts must let people delete them in the app).
+  ///
+  /// Checks for a recent sign-in first, so a refused delete can't leave an
+  /// account whose data is already gone.
   Future<void> deleteAccount() async {
     final user = _user;
     if (user == null) return;
+    if (!auth.signedInRecently) {
+      throw const AuthException(
+        AuthException.requiresRecentLogin,
+        'For safety, log out and back in, then try again.',
+      );
+    }
     await profiles.deleteProfile(user.uid);
     await auth.deleteAccount();
   }

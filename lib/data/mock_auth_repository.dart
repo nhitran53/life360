@@ -19,6 +19,12 @@ class MockAuthRepository implements AuthRepository {
   @override
   AuthUser? get currentUser => _current;
 
+  /// Set to false to try the "log in again first" path (for tests).
+  bool recentLogin = true;
+
+  @override
+  bool get signedInRecently => _current != null && recentLogin;
+
   @override
   Stream<AuthUser?> authStateChanges() {
     // Subscribes to changes the moment someone listens, so nothing that

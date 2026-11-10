@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "386988844410",
+    "project_id": "life360-5e83d",
+    "storage_bucket": "life360-5e83d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:386988844410:android:2ecf63e66b386291e8e2c3",
+        "android_client_info": {
+          "package_name": "com.nhitran.life360"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "386988844410-go3qgrh02akl121cn19l58ib834qnivq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nhitran.life360",
+            "certificate_hash": "6b958ff3f83c19515fd1281b77884b7069021554"
+          }
+        },
+        {
+          "client_id": "386988844410-a1rj2pqlttqjovqohi2k9igc3o7gmake.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDguiEeIlwOqbxbtLhFtBs1otddYhgr7_I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "386988844410-a1rj2pqlttqjovqohi2k9igc3o7gmake.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "386988844410-lrfiula2svugblgn2tfel7rljcrmk2j5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.nhitran.life360"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

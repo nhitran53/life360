@@ -187,6 +187,31 @@ void main() {
       expect(session.goals.steps, 10000);
     });
 
+    test('deleting needs a recent login and then touches nothing', () async {
+      await auth.signUpWithEmail('nhi@example.com', 'password1');
+      await settle();
+      await session.completeOnboarding(
+        displayName: 'Nhi',
+        username: 'nhi',
+        avatarEmoji: '🦊',
+        goals: const DailyGoals(),
+      );
+      auth.recentLogin = false;
+
+      await expectLater(
+        session.deleteAccount(),
+        throwsA(
+          isA<AuthException>().having(
+            (e) => e.code,
+            'code',
+            AuthException.requiresRecentLogin,
+          ),
+        ),
+      );
+      expect(session.status, AccountStatus.ready);
+      expect(await profiles.profileFor(session.user!.uid), isNotNull);
+    });
+
     test('deleting the account removes the profile and the login', () async {
       await auth.signUpWithEmail('nhi@example.com', 'password1');
       await settle();

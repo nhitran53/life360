@@ -6,6 +6,10 @@ abstract interface class AuthRepository {
   /// Who's signed in right now, or null.
   AuthUser? get currentUser;
 
+  /// Whether the current user signed in recently enough to delete their
+  /// account without signing in again.
+  bool get signedInRecently;
+
   /// Emits the signed-in user (or null) whenever it changes.
   Stream<AuthUser?> authStateChanges();
 

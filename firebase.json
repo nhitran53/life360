@@ -1,0 +1,24 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "life360-5e83d",
+          "appId": "1:386988844410:android:2ecf63e66b386291e8e2c3",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "life360-5e83d",
+          "configurations": {
+            "android": "1:386988844410:android:2ecf63e66b386291e8e2c3"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}
