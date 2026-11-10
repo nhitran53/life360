@@ -26,6 +26,34 @@ void main() {
     expect((await db.doc('users/u1/private/settings').get()).exists, isFalse);
   });
 
+  test('isLoaded is false until the saved settings were read', () async {
+    expect(repo.isLoaded, isFalse);
+    var notified = 0;
+    repo.addListener(() => notified++);
+    await repo.load(); // no document yet: the defaults are the real settings
+    expect(repo.isLoaded, isTrue);
+    expect(notified, 1);
+  });
+
+  test(
+    'isLoaded stays false when the load fails, and after a failed save',
+    () async {
+      final failing = FirestoreSharingRepository(_BrokenDb(), uid: 'u1');
+      await failing.load();
+      expect(failing.isLoaded, isFalse);
+      await expectLater(
+        failing.update('u1', const SharingSettings(hidden: {})),
+        throwsA(isA<FirebaseException>()),
+      );
+      expect(failing.isLoaded, isFalse);
+    },
+  );
+
+  test('saving a change counts as loaded', () async {
+    await repo.update('u1', const SharingSettings(hidden: {}));
+    expect(repo.isLoaded, isTrue);
+  });
+
   test('update saves to users/{uid}/private/settings and notifies', () async {
     var notified = 0;
     repo.addListener(() => notified++);

@@ -23,6 +23,13 @@ class FirestoreSharingRepository extends ChangeNotifier
   /// Set once the user changes something, so a slow [load] can't overwrite it.
   var _changed = false;
 
+  var _loaded = false;
+
+  /// True after [load] read the document (or found none), or once the user
+  /// saved a change. A failed [load] leaves it false.
+  @override
+  bool get isLoaded => _loaded;
+
   DocumentReference<Map<String, dynamic>> get _doc =>
       _db.collection('users').doc(uid).collection('private').doc('settings');
 
@@ -35,9 +42,11 @@ class FirestoreSharingRepository extends ChangeNotifier
     } on FirebaseException {
       return;
     }
-    if (data == null || _changed) return;
-    final saved = SharingSettings.fromJson(data);
-    if (saved == _mine) return;
+    if (_changed) return;
+    final saved = data == null ? _mine : SharingSettings.fromJson(data);
+    _loaded = true;
+    // Always announce the first load, so listeners can act on the settings
+    // that are now known to be real.
     _mine = saved;
     notifyListeners();
   }
@@ -54,8 +63,10 @@ class FirestoreSharingRepository extends ChangeNotifier
       throw ArgumentError.value(userId, 'userId', 'Not the signed-in user');
     }
     final previous = _mine;
-    if (previous == settings) return;
+    final wasLoaded = _loaded;
+    if (previous == settings && wasLoaded) return;
     _changed = true;
+    _loaded = true;
     _mine = settings;
     notifyListeners();
     try {
@@ -63,6 +74,7 @@ class FirestoreSharingRepository extends ChangeNotifier
     } catch (_) {
       if (_mine == settings) {
         _mine = previous;
+        _loaded = wasLoaded;
         notifyListeners();
       }
       rethrow;

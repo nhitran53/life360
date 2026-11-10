@@ -9,6 +9,12 @@ import 'mock_data.dart';
 /// It's a [Listenable] so screens and stats can react when the current user
 /// changes what they share.
 abstract interface class SharingRepository implements Listenable {
+  /// Whether [settingsFor] shows what the user actually saved. False until
+  /// the saved settings have been read (or the user changed something), so
+  /// anything that acts on the settings can fail closed instead of trusting
+  /// the private defaults.
+  bool get isLoaded;
+
   /// The settings for [userId]; defaults for anyone who never changed them.
   SharingSettings settingsFor(String userId);
 
@@ -23,6 +29,9 @@ class MockSharingRepository extends ChangeNotifier
     : _settings = {...(initial ?? mockSharing)};
 
   final Map<String, SharingSettings> _settings;
+
+  @override
+  bool get isLoaded => true;
 
   @override
   SharingSettings settingsFor(String userId) =>
