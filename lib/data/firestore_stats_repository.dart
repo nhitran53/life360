@@ -17,10 +17,9 @@ class FirestoreStatsRepository implements StatsRepository {
   FirestoreStatsRepository(
     this._db, {
     required this.own,
-    required FriendsRepository friends,
+    required this._friends,
     DateTime Function()? clock,
-  }) : _friends = friends,
-       _clock = clock ?? DateTime.now;
+  }) : _clock = clock ?? DateTime.now;
 
   final FirebaseFirestore _db;
   final FriendsRepository _friends;
