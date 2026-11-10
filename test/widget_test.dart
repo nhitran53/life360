@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:life360/data/family_store.dart';
 import 'package:life360/hub_screen.dart';
@@ -23,6 +24,9 @@ void useTallPhone(WidgetTester tester) {
 }
 
 void main() {
+      // The app's services remember the health connection in shared_preferences.
+      setUp(() => SharedPreferences.setMockInitialValues({}));
+
       testWidgets('Home screen shows logo, name, tagline and button',
               (WidgetTester tester) async {
                 await tester.pumpWidget(const Friend360App());

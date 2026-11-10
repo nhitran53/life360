@@ -25,13 +25,15 @@ class FakeHealthSource implements HealthSource {
 
   HealthAvailability availabilityResult;
 
-  /// What [requestPermissions] reports and what [fetchDailyStats] honours.
+  /// What [requestPermissions] and [checkPermissions] report, and what
+  /// [fetchDailyStats] honours.
   Map<StatMetric, HealthPermissionStatus> permissionOutcome;
 
   final List<DailyStats> _stats;
 
   /// How many times each method was called, for assertions.
   int requestPermissionsCalls = 0;
+  int checkPermissionsCalls = 0;
   int fetchCalls = 0;
   int openInstallPageCalls = 0;
 
@@ -47,6 +49,12 @@ class FakeHealthSource implements HealthSource {
   @override
   Future<HealthPermissionResult> requestPermissions() async {
     requestPermissionsCalls++;
+    return HealthPermissionResult(permissionOutcome);
+  }
+
+  @override
+  Future<HealthPermissionResult> checkPermissions() async {
+    checkPermissionsCalls++;
     return HealthPermissionResult(permissionOutcome);
   }
 

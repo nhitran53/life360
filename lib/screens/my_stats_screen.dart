@@ -79,12 +79,19 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
   var _view = MyStatsView.today;
   var _syncing = false;
   var _syncFailed = false;
-  late Future<_MyStatsData> _data = _load();
+  late Future<_MyStatsData> _data = _restoreAndLoad();
 
   /// The stats source when it can connect to a health platform.
   ConnectableStatsRepository? get _connectable {
     final stats = _stats;
     return stats is ConnectableStatsRepository ? stats : null;
+  }
+
+  /// First load: reconnect a previously connected health source so the card
+  /// opens on Sync, not Connect.
+  Future<_MyStatsData> _restoreAndLoad() async {
+    await _connectable?.restoreConnection();
+    return _load();
   }
 
   Future<_MyStatsData> _load() async {

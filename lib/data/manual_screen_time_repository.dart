@@ -46,6 +46,9 @@ class ManualScreenTimeRepository implements ConnectableStatsRepository {
   Future<bool> connect() => _inner.connect();
 
   @override
+  Future<void> restoreConnection() => _inner.restoreConnection();
+
+  @override
   Future<void> openInstallPage() => _inner.openInstallPage();
 
   @override

@@ -25,6 +25,10 @@ abstract interface class ConnectableStatsRepository implements StatsRepository {
   /// one metric is readable.
   Future<bool> connect();
 
+  /// On launch, reconnects if the user connected before. Never throws and
+  /// does nothing for sources that were never connected.
+  Future<void> restoreConnection();
+
   /// Sends the user to the store to install or update the health app.
   Future<void> openInstallPage();
 }

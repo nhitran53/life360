@@ -1,11 +1,16 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 import 'data/circle_repository.dart';
 import 'data/connectable_stats_repository.dart';
 import 'data/friends_repository.dart';
 import 'data/health/fake_health_source.dart';
+import 'data/health/health_connection_store.dart';
 import 'data/health/health_package_source.dart';
 import 'data/health/health_source.dart';
+import 'data/health/takeout_health_source.dart';
 import 'data/health_stats_repository.dart';
 import 'data/mock_circle_repository.dart';
 import 'data/mock_data.dart';
@@ -46,23 +51,31 @@ class AppServices {
   factory AppServices.defaults() {
     final friends = MockFriendsRepository();
     final mockStats = MockStatsRepository(friends: friends);
-    final onPhone = !kIsWeb &&
+    final onPhone =
+        !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.android ||
             defaultTargetPlatform == TargetPlatform.iOS);
-    final HealthSource source = onPhone
+    // Debug only: `--dart-define=TAKEOUT_JSON=/path/daily.json` serves real
+    // daily totals from a Takeout export instead of the platform store.
+    const takeoutPath = String.fromEnvironment('TAKEOUT_JSON');
+    final HealthSource source = kDebugMode && !kIsWeb && takeoutPath.isNotEmpty
+        ? TakeoutHealthSource(load: () => File(takeoutPath).readAsString())
+        : onPhone
         ? HealthPackageSource()
         : FakeHealthSource(
             stats: generateMockStats(today: DateTime.now())
                 .where((s) => s.userId == mockMe.id),
           );
-    return AppServices(
+    final health = HealthStatsRepository(
+      source: source,
+      fallback: mockStats,
       friends: friends,
-      stats: HealthStatsRepository(
-        source: source,
-        fallback: mockStats,
-        friends: friends,
-      ),
+      store: SharedPreferencesHealthConnectionStore(),
     );
+    // Reconnect in the background so other screens see health stats too;
+    // My Stats waits for the same (shared) future.
+    unawaited(health.restoreConnection());
+    return AppServices(friends: friends, stats: health);
   }
 
   final FriendsRepository friends;
