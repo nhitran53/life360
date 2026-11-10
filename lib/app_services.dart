@@ -48,8 +48,10 @@ class AppServices {
 
   /// Real health data on Android/iOS; on other platforms (no health store)
   /// a fake source seeded with mock data so the UI is still demo-able.
-  factory AppServices.defaults() {
-    final friends = MockFriendsRepository();
+  /// Pass [friends] to use real friends (signed in through Firebase);
+  /// otherwise everyone comes from the mock data.
+  factory AppServices.defaults({FriendsRepository? friends}) {
+    friends ??= MockFriendsRepository();
     final mockStats = MockStatsRepository(friends: friends);
     final onPhone =
         !kIsWeb &&

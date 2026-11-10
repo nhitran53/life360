@@ -164,7 +164,11 @@ class _CircleScreenState extends State<CircleScreen> {
               onOpenFriendsStats: _openFriendsStats,
             ),
             NudgeScreen(key: _nudgeKey, initialRecipient: _nudgeRecipient),
-            PrivacyScreen(sharing: _services.sharing),
+            PrivacyScreen(
+              sharing: _services.sharing,
+              // Your own settings once signed in (mock "You" otherwise).
+              userId: AccountScope.maybeOf(context)?.profile?.id,
+            ),
           ],
         ),
       ),

@@ -1,0 +1,14 @@
+{
+  "name": "friend360-firestore-rules-tests",
+  "private": true,
+  "description": "Tests for ../firestore.rules. Run from the repo root: npm --prefix firestore-tests run test:emulator",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "test:emulator": "firebase emulators:exec --only firestore --project demo-friend360 \"npm test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.2.0"
+  }
+}

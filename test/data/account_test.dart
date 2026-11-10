@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/data/account_session.dart';
 import 'package:life360/data/auth_repository.dart';
 import 'package:life360/data/mock_auth_repository.dart';
+import 'package:life360/data/mock_friends_repository.dart';
 import 'package:life360/data/mock_profile_repository.dart';
 import 'package:life360/data/profile_repository.dart';
 import 'package:life360/models/models.dart';
@@ -185,6 +186,43 @@ void main() {
       await settle();
       expect(session.status, AccountStatus.ready);
       expect(session.goals.steps, 10000);
+    });
+
+    test('builds real friends for the signed-in profile only', () async {
+      final made = <String>[];
+      final withFriends = AccountSession(
+        auth: auth,
+        profiles: profiles,
+        friendsFor: (me) {
+          made.add(me.username);
+          return MockFriendsRepository();
+        },
+      );
+      addTearDown(withFriends.dispose);
+      await settle();
+      expect(withFriends.friends, isNull);
+
+      await auth.signUpWithEmail('nhi@example.com', 'password1');
+      await settle();
+      expect(withFriends.friends, isNull); // no profile yet
+
+      await withFriends.completeOnboarding(
+        displayName: 'Nhi',
+        username: 'nhi',
+        avatarEmoji: '🦊',
+        goals: const DailyGoals(),
+      );
+      expect(withFriends.friends, isNotNull);
+      expect(made, ['nhi']);
+
+      await withFriends.signOut();
+      await settle();
+      expect(withFriends.friends, isNull);
+
+      await auth.signInWithEmail('nhi@example.com', 'password1');
+      await settle();
+      expect(withFriends.friends, isNotNull);
+      expect(made, ['nhi', 'nhi']);
     });
 
     test('deleting needs a recent login and then touches nothing', () async {

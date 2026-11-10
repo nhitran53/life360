@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'data/account_session.dart';
 import 'data/firebase_auth_repository.dart';
+import 'data/firestore_friends_repository.dart';
 import 'data/firestore_profile_repository.dart';
 import 'firebase_options.dart';
 import 'data/mock_auth_repository.dart';
@@ -36,9 +37,11 @@ Future<AccountSession?> _firebaseSession() async {
     debugPrint('Firebase is not set up for this platform: using mock accounts');
     return null;
   }
+  final db = FirebaseFirestore.instance;
   return AccountSession(
     auth: FirebaseAuthRepository(),
-    profiles: FirestoreProfileRepository(FirebaseFirestore.instance),
+    profiles: FirestoreProfileRepository(db),
+    friendsFor: (me) => FirestoreFriendsRepository(db, me: me),
   );
 }
 
