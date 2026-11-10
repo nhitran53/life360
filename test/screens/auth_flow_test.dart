@@ -4,10 +4,23 @@ import 'package:life360/data/account_session.dart';
 import 'package:life360/data/mock_auth_repository.dart';
 import 'package:life360/data/mock_profile_repository.dart';
 import 'package:life360/main.dart';
+import 'package:life360/models/models.dart';
 import 'package:life360/screens/account_screen.dart';
 import 'package:life360/screens/circle_screen.dart';
 import 'package:life360/screens/onboarding_screen.dart';
 import 'package:life360/screens/sign_in_screen.dart';
+
+/// Saving fails like a server or network error would (not "username taken").
+class _FailingProfiles extends MockProfileRepository {
+  @override
+  Future<UserProfile> createProfile({
+    required String uid,
+    required String displayName,
+    required String username,
+    required String avatarEmoji,
+    DailyGoals goals = const DailyGoals(),
+  }) => Future.error(Exception('permission-denied'));
+}
 
 void main() {
   late MockAuthRepository auth;
@@ -128,6 +141,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text("That email and password don't match"), findsOneWidget);
+  });
+
+  testWidgets('A failed save shows a message instead of doing nothing', (
+    tester,
+  ) async {
+    auth = MockAuthRepository();
+    session = AccountSession(auth: auth, profiles: _FailingProfiles());
+    addTearDown(() {
+      session.dispose();
+      auth.dispose();
+    });
+    await startApp(tester);
+    await signUp(tester);
+
+    await tester.enterText(find.byKey(const ValueKey('name-field')), 'Nhi');
+    await tester.enterText(find.byKey(const ValueKey('username-field')), 'nhi');
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("Let's go! 🎉"));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        "Couldn't save your profile. Check your connection and try again.",
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(OnboardingScreen), findsOneWidget);
+    expect(find.text("Let's go! 🎉"), findsOneWidget);
   });
 
   testWidgets('Taken usernames are rejected during onboarding', (tester) async {

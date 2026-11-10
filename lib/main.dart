@@ -1,8 +1,13 @@
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'data/account_session.dart';
+import 'data/firebase_auth_repository.dart';
+import 'data/firestore_profile_repository.dart';
+import 'firebase_options.dart';
 import 'data/mock_auth_repository.dart';
 import 'data/mock_profile_repository.dart';
 import 'models/stat_metric.dart';
@@ -14,12 +19,33 @@ import 'theme/app_theme.dart';
 import 'theme/stat_colors.dart';
 import 'widgets/chunky.dart';
 
-void main() => runApp(const Friend360App());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(Friend360App(session: await _firebaseSession()));
+}
+
+/// Real accounts through Firebase, or null (mock accounts) on platforms
+/// that aren't set up in Firebase yet. Run `flutterfire configure` to add
+/// one: it updates lib/firebase_options.dart.
+Future<AccountSession?> _firebaseSession() async {
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on UnsupportedError {
+    debugPrint('Firebase is not set up for this platform: using mock accounts');
+    return null;
+  }
+  return AccountSession(
+    auth: FirebaseAuthRepository(),
+    profiles: FirestoreProfileRepository(FirebaseFirestore.instance),
+  );
+}
 
 class Friend360App extends StatefulWidget {
   const Friend360App({super.key, this.session});
 
-  /// Defaults to in-memory mock accounts until Firebase is connected.
+  /// Defaults to in-memory mock accounts (tests, unconfigured platforms).
   final AccountSession? session;
 
   @override
@@ -27,7 +53,8 @@ class Friend360App extends StatefulWidget {
 }
 
 class _Friend360AppState extends State<Friend360App> {
-  late final AccountSession _session = widget.session ??
+  late final AccountSession _session =
+      widget.session ??
       (_ownSession = AccountSession(
         auth: MockAuthRepository(),
         profiles: MockProfileRepository(),
@@ -49,9 +76,7 @@ class _Friend360AppState extends State<Friend360App> {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         home: const AuthGate(welcome: HomeScreen()),
-        routes: {
-          privacyPolicyRoute: (_) => const PrivacyPolicyScreen(),
-        },
+        routes: {privacyPolicyRoute: (_) => const PrivacyPolicyScreen()},
       ),
     );
   }
@@ -92,9 +117,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _openSignIn(SignInMode mode) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => SignInScreen(initialMode: mode),
-      ),
+      MaterialPageRoute<void>(builder: (_) => SignInScreen(initialMode: mode)),
     );
   }
 
@@ -108,7 +131,9 @@ class _HomeScreenState extends State<HomeScreen>
           builder: (context, constraints) => SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight - 40),
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - 40,
+              ),
               child: IntrinsicHeight(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -190,9 +215,7 @@ class _StatRing extends StatelessWidget {
                 child: ExcludeSemantics(
                   child: Text(
                     '360',
-                    style: Theme.of(context)
-                        .textTheme
-                        .displayLarge
+                    style: Theme.of(context).textTheme.displayLarge
                         ?.copyWith(fontSize: 52),
                   ),
                 ),
