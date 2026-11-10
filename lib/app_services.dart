@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import 'data/circle_repository.dart';
 import 'data/connectable_stats_repository.dart';
+import 'data/firestore_stats_publisher.dart';
+import 'data/firestore_stats_repository.dart';
 import 'data/friends_repository.dart';
 import 'data/health/fake_health_source.dart';
 import 'data/health/health_connection_store.dart';
@@ -17,9 +20,12 @@ import 'data/mock_data.dart';
 import 'data/mock_friends_repository.dart';
 import 'data/manual_screen_time_repository.dart';
 import 'data/mock_stats_repository.dart';
+import 'data/published_sharing_repository.dart';
 import 'data/screen_time_log.dart';
 import 'data/sharing_repository.dart';
 import 'data/sharing_stats_repository.dart';
+import 'data/stats_repository.dart';
+import 'data/stats_sync.dart';
 
 /// The app's repositories, created once and passed down to screens.
 class AppServices {
@@ -31,9 +37,9 @@ class AppServices {
     CircleRepository? circles,
     SharingRepository? sharing,
     ScreenTimeLog? screenTime,
-  })  : circles = circles ?? MockCircleRepository(),
-        sharing = sharing ?? MockSharingRepository(),
-        screenTime = screenTime ?? InMemoryScreenTimeLog() {
+  }) : circles = circles ?? MockCircleRepository(),
+       sharing = sharing ?? MockSharingRepository(),
+       screenTime = screenTime ?? InMemoryScreenTimeLog() {
     rawStats = ManualScreenTimeRepository(
       inner: stats,
       friends: friends,
@@ -52,9 +58,15 @@ class AppServices {
   /// otherwise everyone comes from the mock data. Pass [sharing] to save
   /// the user's sharing settings (Firebase session); otherwise they're
   /// in-memory and reset on every launch.
+  ///
+  /// Pass [statsDb] and [userId] (Firebase session, with [sharing]) to
+  /// publish the user's own stats and read friends' stats from Firestore;
+  /// otherwise stats stay on the device and friends' come from the mock data.
   factory AppServices.defaults({
     FriendsRepository? friends,
     SharingRepository? sharing,
+    FirebaseFirestore? statsDb,
+    String? userId,
   }) {
     friends ??= MockFriendsRepository();
     final mockStats = MockStatsRepository(friends: friends);
@@ -73,17 +85,51 @@ class AppServices {
             stats: generateMockStats(today: DateTime.now())
                 .where((s) => s.userId == mockMe.id),
           );
+    final publishing = statsDb != null && userId != null && sharing != null;
+    StatsSync? sync;
+    // Friends' settings are private to them: with Firestore, what they share
+    // is read off their published days instead.
+    final published = statsDb == null
+        ? null
+        : PublishedSharingRepository(sharing ?? MockSharingRepository());
+    final StatsRepository fallback = statsDb == null
+        ? mockStats
+        : FirestoreStatsRepository(
+            statsDb,
+            own: mockStats,
+            friends: friends,
+            published: published,
+          );
     final health = HealthStatsRepository(
       source: source,
-      fallback: mockStats,
+      fallback: fallback,
       friends: friends,
       store: SharedPreferencesHealthConnectionStore(),
+      onSynced: () => unawaited(sync?.sync()),
     );
+    final services = AppServices(
+      friends: friends,
+      stats: health,
+      sharing: published ?? sharing,
+    );
+    if (publishing) {
+      sync = services._sync = StatsSync(
+        source: services.rawStats,
+        sharing: sharing,
+        publisher: FirestoreStatsPublisher(statsDb, uid: userId),
+        userId: userId,
+      )..start();
+    }
     // Reconnect in the background so other screens see health stats too;
     // My Stats waits for the same (shared) future.
     unawaited(health.restoreConnection());
-    return AppServices(friends: friends, stats: health, sharing: sharing);
+    return services;
   }
+
+  StatsSync? _sync;
+
+  /// Stops publishing stats. Call when the user signs out.
+  void dispose() => _sync?.dispose();
 
   final FriendsRepository friends;
 

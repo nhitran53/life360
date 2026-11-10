@@ -36,12 +36,29 @@ class _AuthGateState extends State<AuthGate> {
     final id = session.profile?.id;
     if (_services == null || _servicesFor != id) {
       _servicesFor = id;
+      _services?.dispose();
       _services = AppServices.defaults(
         friends: session.friends,
         sharing: session.sharing,
+        statsDb: session.statsDb,
+        userId: id,
       );
     }
     return _services!;
+  }
+
+  /// Stops publishing and forgets the services, so signing in again (even
+  /// as the same user) starts with fresh ones on the new session.
+  void _releaseServices() {
+    _services?.dispose();
+    _services = null;
+    _servicesFor = null;
+  }
+
+  @override
+  void dispose() {
+    _releaseServices();
+    super.dispose();
   }
 
   @override
@@ -57,6 +74,8 @@ class _AuthGateState extends State<AuthGate> {
       });
     }
     _shown = status;
+
+    if (status != AccountStatus.ready) _releaseServices();
 
     return switch (status) {
       AccountStatus.loading => const Scaffold(

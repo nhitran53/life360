@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/widgets.dart';
 
 import '../models/models.dart';
@@ -26,6 +27,7 @@ class AccountSession extends ChangeNotifier {
     required this.profiles,
     this.friendsFor,
     this.sharingFor,
+    this.statsDb,
   }) {
     _sub = auth.authStateChanges().listen(_onAuthChanged);
   }
@@ -40,6 +42,10 @@ class AccountSession extends ChangeNotifier {
   /// Builds the saved sharing settings for a signed-in profile. Null (mock
   /// accounts) means settings stay in memory.
   final SharingRepository Function(UserProfile me)? sharingFor;
+
+  /// Where daily stats are published and friends' are read. Null (mock
+  /// accounts) means stats stay on the device and friends' are mock data.
+  final FirebaseFirestore? statsDb;
 
   FriendsRepository? _friends;
   SharingRepository? _sharing;

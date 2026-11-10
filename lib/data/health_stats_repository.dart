@@ -18,6 +18,7 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     required this._friends,
     HealthConnectionStore? store,
     DateTime Function()? clock,
+    this.onSynced,
   }) : _store = store ?? InMemoryHealthConnectionStore(),
        _clock = clock ?? DateTime.now;
 
@@ -26,6 +27,10 @@ class HealthStatsRepository implements ConnectableStatsRepository {
   final FriendsRepository _friends;
   final HealthConnectionStore _store;
   final DateTime Function() _clock;
+
+  /// Called after every connect, re-sync and restore finishes, connected or
+  /// not (e.g. to publish the fresh stats). Must not throw.
+  final void Function()? onSynced;
 
   Future<void>? _restoring;
   bool _connected = false;
@@ -84,6 +89,7 @@ class HealthStatsRepository implements ConnectableStatsRepository {
       if (_connected) _lastSyncedAt = _clock();
     }
     await _remember(_connected);
+    onSynced?.call();
     return _connected;
   }
 

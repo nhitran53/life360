@@ -114,9 +114,14 @@ class FirestoreProfileRepository implements ProfileRepository {
         .collection('friendships')
         .where('users', arrayContains: uid)
         .get();
+    // Published daily stats go too (see FirestoreStatsPublisher).
+    final daily = await _user(uid).collection('daily').get();
     final batch = _db.batch()
       ..delete(_goals(uid))
       ..delete(_sharing(uid));
+    for (final d in daily.docs) {
+      batch.delete(d.reference);
+    }
     for (final f in friendships.docs) {
       batch.delete(f.reference);
     }
