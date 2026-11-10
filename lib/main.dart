@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +9,7 @@ import 'data/account_session.dart';
 import 'data/firebase_auth_repository.dart';
 import 'data/firestore_friends_repository.dart';
 import 'data/firestore_profile_repository.dart';
+import 'data/firestore_sharing_repository.dart';
 import 'firebase_options.dart';
 import 'data/mock_auth_repository.dart';
 import 'data/mock_profile_repository.dart';
@@ -42,6 +44,11 @@ Future<AccountSession?> _firebaseSession() async {
     auth: FirebaseAuthRepository(),
     profiles: FirestoreProfileRepository(db),
     friendsFor: (me) => FirestoreFriendsRepository(db, me: me),
+    sharingFor: (me) {
+      final sharing = FirestoreSharingRepository(db, uid: me.id);
+      unawaited(sharing.load());
+      return sharing;
+    },
   );
 }
 

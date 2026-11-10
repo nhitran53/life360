@@ -17,7 +17,7 @@ Target users are friend groups and classmates who want light, fun accountability
 ## Tech stack
 
 - **Flutter** (Dart SDK `^3.13.5`), Material 3. Targets: iOS and Android first. Web and desktop folders exist but are not priorities.
-- No backend yet. Planned: Firebase (Auth + Firestore) for accounts, friends and synced stats.
+- Firebase Auth and Firestore are used for accounts, profiles, friends and saved sharing settings (see `firestore.rules`); Firebase is set up for Android only so far. Friends' stats and circles are still mock data, and other platforms fall back to mock accounts.
 - Planned health data: the [`health`](https://pub.dev/packages/health) package (HealthKit + Health Connect) and the Fitbit Web API (OAuth) as an optional extra source.
 
 ## Project layout

@@ -37,13 +37,19 @@ class SharingSettings {
 
   factory SharingSettings.fromJson(Map<String, dynamic> json) =>
       SharingSettings(
-        hidden: {
-          for (final name in (json['hidden'] as List? ?? const []))
-            ...StatMetric.values.where((m) => m.name == name),
+        // A missing or malformed list keeps the private defaults, never
+        // "share everything".
+        hidden: switch (json['hidden']) {
+          final List names => {
+            for (final name in names)
+              ...StatMetric.values.where((m) => m.name == name),
+          },
+          _ => defaultHidden,
         },
-        pausedUntil: json['pausedUntil'] == null
-            ? null
-            : DateTime.parse(json['pausedUntil'] as String),
+        pausedUntil: switch (json['pausedUntil']) {
+          final String text => DateTime.tryParse(text)?.toLocal(),
+          _ => null,
+        },
       );
 
   Map<String, dynamic> toJson() => {
@@ -51,7 +57,8 @@ class SharingSettings {
       for (final m in StatMetric.values)
         if (hidden.contains(m)) m.name,
     ],
-    'pausedUntil': pausedUntil?.toIso8601String(),
+    // UTC, so the instant is the same on every device.
+    'pausedUntil': pausedUntil?.toUtc().toIso8601String(),
   };
 
   @override

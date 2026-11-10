@@ -66,16 +66,25 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
     super.dispose();
   }
 
+  /// Saves [settings]; the repository shows them right away and puts the
+  /// old ones back if saving fails.
+  Future<void> _save(SharingSettings settings) async {
+    try {
+      await _repo.update(_userId, settings);
+    } catch (_) {
+      if (mounted) showCircleSnack(context, "Couldn't save that. Try again.");
+    }
+  }
+
   void _toggle(StatMetric metric) {
     final shared = !_settings.hidden.contains(metric);
-    _repo.update(_userId, _settings.withShared(metric, !shared));
+    _save(_settings.withShared(metric, !shared));
   }
 
   void _togglePause() {
     final now = _clock();
     final pausing = !_settings.isPaused(now);
-    _repo.update(
-      _userId,
+    _save(
       _settings.withPause(pausing ? now.add(const Duration(hours: 24)) : null),
     );
     showCircleSnack(

@@ -54,6 +54,33 @@ void main() {
           .withPause(now);
       expect(SharingSettings.fromJson(s.toJson()), s);
     });
+
+    test('JSON stores the pause as UTC and only metric names', () {
+      final json = const SharingSettings(hidden: {StatMetric.sleep})
+          .withPause(DateTime.utc(2026, 3, 12, 9))
+          .toJson();
+      expect(json, {
+        'hidden': ['sleep'],
+        'pausedUntil': '2026-03-12T09:00:00.000Z',
+      });
+    });
+
+    test('missing or malformed JSON stays private', () {
+      expect(
+        SharingSettings.fromJson({}).hidden,
+        SharingSettings.defaultHidden,
+      );
+      expect(
+        SharingSettings.fromJson({'hidden': 'steps'}).hidden,
+        SharingSettings.defaultHidden,
+      );
+      final s = SharingSettings.fromJson({
+        'hidden': ['nonsense', 'steps'],
+        'pausedUntil': 'not a date',
+      });
+      expect(s.hidden, {StatMetric.steps});
+      expect(s.pausedUntil, isNull);
+    });
   });
 
   group('SharingStatsRepository', () {

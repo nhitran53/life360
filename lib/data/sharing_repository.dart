@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import 'mock_data.dart';
 
-/// Each user's [SharingSettings]. Will be backed by Firestore later
-/// (`users/{uid}/private/settings`).
+/// Each user's [SharingSettings]. [FirestoreSharingRepository] stores the
+/// signed-in user's in `users/{uid}/private/settings`.
 ///
 /// It's a [Listenable] so screens and stats can react when the current user
 /// changes what they share.
