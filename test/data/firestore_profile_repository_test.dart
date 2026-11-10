@@ -97,8 +97,10 @@ void main() {
 
   test('delete removes everything and frees the username', () async {
     final profile = await createNhi();
+    await db.doc('users/u1/daily/2026-03-12').set({'date': '2026-03-12'});
     await repo.deleteProfile('u1');
 
+    expect((await db.doc('users/u1/daily/2026-03-12').get()).exists, isFalse);
     expect((await db.doc('users/u1').get()).exists, isFalse);
     expect((await db.doc('users/u1/private/goals').get()).exists, isFalse);
     expect((await db.doc('usernames/nhi').get()).exists, isFalse);
