@@ -90,6 +90,12 @@ class HealthPackageSource implements HealthSource {
     return _currentPermissions();
   }
 
+  @override
+  Future<HealthPermissionResult> checkPermissions() async {
+    await _ensureConfigured();
+    return _currentPermissions();
+  }
+
   Future<HealthPermissionResult> _currentPermissions() async {
     final statuses = <StatMetric, HealthPermissionStatus>{};
     for (final metric in readableMetrics) {

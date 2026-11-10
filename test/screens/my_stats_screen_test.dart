@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/data/connectable_stats_repository.dart';
 import 'package:life360/data/health/fake_health_source.dart';
+import 'package:life360/data/health/health_connection_store.dart';
 import 'package:life360/data/health/health_source.dart';
 import 'package:life360/data/health_stats_repository.dart';
 import 'package:life360/data/mock_data.dart';
@@ -74,10 +75,10 @@ void main() {
     await pumpScreen(tester);
     final recent = await stats.dailyStats(
       mockMe.id,
-      from: now.subtract(const Duration(days: 30)),
+      from: DateTime(now.year, now.month, now.day - 60),
       to: now,
     );
-    final streak = currentStreak(recent, today: now);
+    final streak = streakWithFreezes(recent, today: now).days;
     final xp = weeklyXp(await stats.weeklySummary(mockMe.id, weekOf: now));
 
     expect(find.bySemanticsLabel('$streak day streak'), findsOneWidget);
@@ -240,6 +241,54 @@ void main() {
 
       await tapKey(tester, 'connect-button');
       expect(source.requestPermissionsCalls, 2);
+    });
+
+    testWidgets('a restart with a saved connection opens on Sync now', (
+      tester,
+    ) async {
+      final store = InMemoryHealthConnectionStore();
+      // First run: the user connects, which saves the flag.
+      await HealthStatsRepository(
+        source: sourceWith(),
+        fallback: MockStatsRepository(friends: realFriends),
+        friends: realFriends,
+        store: store,
+      ).connect();
+
+      // Restart: a fresh repository over the same store, no tap.
+      final source = sourceWith();
+      await pumpConnectable(
+        tester,
+        HealthStatsRepository(
+          source: source,
+          fallback: MockStatsRepository(friends: realFriends),
+          friends: realFriends,
+          store: store,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(source.requestPermissionsCalls, 0);
+      expect(find.text('Sync now'), findsOneWidget);
+      expect(find.text('Connect Health Connect'), findsNothing);
+      expect(find.text('Health Connect connected'), findsOneWidget);
+      expect(find.textContaining('4,321 steps'), findsOneWidget);
+    });
+
+    testWidgets('a restart without a saved connection still offers Connect', (
+      tester,
+    ) async {
+      await pumpConnectable(
+        tester,
+        HealthStatsRepository(
+          source: sourceWith(),
+          fallback: MockStatsRepository(friends: realFriends),
+          friends: realFriends,
+          store: InMemoryHealthConnectionStore(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Connect Health Connect'), findsOneWidget);
     });
 
     testWidgets('denied metrics show No access instead of 0', (tester) async {
@@ -435,6 +484,9 @@ void main() {
 /// Stats repository with a switchable failure and a gate to delay fetches.
 class _StubStats implements ConnectableStatsRepository {
   _StubStats({required this.me});
+
+  @override
+  Future<void> restoreConnection() async {}
 
   final String Function() me;
   bool fail = false;

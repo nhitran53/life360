@@ -66,6 +66,11 @@ abstract interface class HealthSource {
   /// needed) and reports the outcome per metric.
   Future<HealthPermissionResult> requestPermissions();
 
+  /// Reports what is currently granted without showing any permission UI.
+  /// Safe to call at launch; only [requestPermissions] may prompt. Like
+  /// [requestPermissions], iOS read access is reported as unknown.
+  Future<HealthPermissionResult> checkPermissions();
+
   /// Daily stats for [userId] from [from] to [to] (both inclusive, by local
   /// day), oldest first. Metrics without read access stay 0 and days with no
   /// data at all are omitted, so a missing day never reads as a real zero.

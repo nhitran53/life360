@@ -100,6 +100,7 @@ class _CircleScreenState extends State<CircleScreen> {
         builder: (_) => MyStatsScreen(
           friends: _services.friends,
           stats: _services.stats,
+          screenTimeLog: _services.screenTime,
           // Your own goals once you're signed in.
           goals: AccountScope.maybeOf(context)?.goals ?? const DailyGoals(),
         ),
