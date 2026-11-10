@@ -5,6 +5,7 @@ rules_version = '2';
 // users/{uid}                 public profile: any signed-in user can read
 // users/{uid}/private/{doc}   goals etc.: only the owner
 // usernames/{username}        {uid} claim that keeps usernames unique
+// friendships/{a}_{b}         friend requests and friends, one per pair
 // friendCodes/{code}          {uid} claim that keeps friend codes unique
 //
 // Claims are only accepted together with the matching profile (same
@@ -34,6 +35,12 @@ service cloud.firestore {
         && name.matches('^[a-z][a-z0-9_.]{2,19}$')
         && !name.matches('.*[.][.].*')
         && !name.matches('.*[.]$');
+    }
+
+    // Matches friendshipId() in lib/data/firestore_friends_repository.dart.
+    function isPairId(pairId, a, b) {
+      return (a < b && pairId == a + '_' + b)
+        || (b < a && pairId == b + '_' + a);
     }
 
     // Same alphabet as generateFriendCode() in lib/models/account.dart.
@@ -79,6 +86,42 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
 
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // One document per pair of people, id "<lower uid>_<higher uid>", so a
+    // pair can't have two requests. Firebase uids never contain "_".
+    // Declining, cancelling and unfriending all delete the document.
+    match /friendships/{pairId} {
+      // A single get works even before the document exists (so the app
+      // can check for an existing request), but only for your own pairs.
+      allow get: if signedIn() && request.auth.uid in pairId.split('_');
+      // Queries must be limited to friendships you're part of.
+      allow list: if signedIn() && request.auth.uid in resource.data.users;
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['requesterId', 'addresseeId', 'users', 'status', 'createdAt'])
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.addresseeId is string
+        && request.resource.data.addresseeId != request.auth.uid
+        && request.resource.data.users ==
+             [request.resource.data.requesterId, request.resource.data.addresseeId]
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && isPairId(pairId, request.auth.uid, request.resource.data.addresseeId)
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && exists(/databases/$(database)/documents/users/$(request.resource.data.addresseeId));
+
+      // Only the person who was asked can accept, and only that changes.
+      allow update: if signedIn()
+        && resource.data.addresseeId == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'respondedAt'])
+        && request.resource.data.respondedAt == request.time;
+
+      allow delete: if signedIn() && request.auth.uid in resource.data.users;
     }
 
     match /friendCodes/{code} {

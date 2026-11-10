@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../models/models.dart';
 import 'auth_repository.dart';
+import 'friends_repository.dart';
 import 'profile_repository.dart';
 
 enum AccountStatus {
@@ -19,12 +20,26 @@ enum AccountStatus {
 /// Who's signed in and their profile. The app listens to this to decide
 /// between the welcome screen, onboarding and the app itself.
 class AccountSession extends ChangeNotifier {
-  AccountSession({required this.auth, required this.profiles}) {
+  AccountSession({
+    required this.auth,
+    required this.profiles,
+    this.friendsFor,
+  }) {
     _sub = auth.authStateChanges().listen(_onAuthChanged);
   }
 
   final AuthRepository auth;
   final ProfileRepository profiles;
+
+  /// Builds the real friends repository for a signed-in profile. Null
+  /// (mock accounts) means screens keep using the mock friends.
+  final FriendsRepository Function(UserProfile me)? friendsFor;
+
+  FriendsRepository? _friends;
+
+  /// Your real friends once [status] is [AccountStatus.ready], or null when
+  /// there's no backend (mock accounts).
+  FriendsRepository? get friends => _friends;
   late final StreamSubscription<AuthUser?> _sub;
 
   AccountStatus _status = AccountStatus.loading;
@@ -51,6 +66,7 @@ class AccountSession extends ChangeNotifier {
     _user = user;
     if (user == null) {
       _profile = null;
+      _friends = null;
       _goals = const DailyGoals();
       _set(AccountStatus.signedOut);
       return;
@@ -59,6 +75,7 @@ class AccountSession extends ChangeNotifier {
     final goals = await profiles.goalsFor(user.uid);
     if (generation != _generation || _disposed) return;
     _profile = profile;
+    _friends = profile == null ? null : friendsFor?.call(profile);
     _goals = goals;
     _set(profile == null ? AccountStatus.needsProfile : AccountStatus.ready);
   }
@@ -78,13 +95,14 @@ class AccountSession extends ChangeNotifier {
   }) async {
     final user = _user;
     if (user == null) throw StateError('Nobody is signed in');
-    _profile = await profiles.createProfile(
+    final profile = _profile = await profiles.createProfile(
       uid: user.uid,
       displayName: displayName,
       username: username,
       avatarEmoji: avatarEmoji,
       goals: goals,
     );
+    _friends = friendsFor?.call(profile);
     _goals = goals;
     _set(AccountStatus.ready);
   }

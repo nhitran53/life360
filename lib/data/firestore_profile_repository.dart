@@ -10,6 +10,8 @@ import 'profile_repository.dart';
 /// Layout (see firestore.rules):
 /// - `users/{uid}`: public profile (name, @username, avatar, friend code)
 /// - `users/{uid}/private/goals`: daily goals, only the owner can read them
+/// - `friendships/...`: deleted along with the profile (see
+///   FirestoreFriendsRepository)
 /// - `usernames/{username}` and `friendCodes/{code}`: `{uid}` claims that
 ///   keep both unique. They're written in the same transaction as the
 ///   profile, and the rules only accept a claim that matches it.
@@ -103,7 +105,15 @@ class FirestoreProfileRepository implements ProfileRepository {
   @override
   Future<void> deleteProfile(String uid) async {
     final profile = await profileFor(uid);
+    // Friendships and requests go too, so you vanish from friends' lists.
+    final friendships = await _db
+        .collection('friendships')
+        .where('users', arrayContains: uid)
+        .get();
     final batch = _db.batch()..delete(_goals(uid));
+    for (final f in friendships.docs) {
+      batch.delete(f.reference);
+    }
     if (profile != null) {
       batch
         ..delete(_username(profile.username))

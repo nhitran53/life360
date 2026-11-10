@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_services.dart';
 import '../data/account_session.dart';
 import '../theme/app_colors.dart';
 import 'circle_screen.dart';
@@ -26,9 +27,24 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   AccountStatus? _shown;
 
+  /// Made once per signed-in profile, so screens keep one set of
+  /// repositories (and one health connection) while you're signed in.
+  AppServices? _services;
+  String? _servicesFor;
+
+  AppServices _servicesOf(AccountSession session) {
+    final id = session.profile?.id;
+    if (_services == null || _servicesFor != id) {
+      _servicesFor = id;
+      _services = AppServices.defaults(friends: session.friends);
+    }
+    return _services!;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final status = AccountScope.of(context).status;
+    final session = AccountScope.of(context);
+    final status = session.status;
 
     // Signing in, finishing onboarding or logging out swaps the root
     // screen, so close whatever was pushed on top (sign-in, account page).
@@ -48,7 +64,8 @@ class _AuthGateState extends State<AuthGate> {
       AccountStatus.signedOut => widget.welcome,
       AccountStatus.needsProfile => const OnboardingScreen(),
       AccountStatus.ready =>
-        widget.signedIn?.call(context) ?? const CircleScreen(),
+        widget.signedIn?.call(context) ??
+            CircleScreen(services: _servicesOf(session)),
     };
   }
 }
