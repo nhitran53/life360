@@ -69,7 +69,11 @@ void main() {
     final data = (await db.doc('users/u1/private/settings').get()).data()!;
     expect(data.keys.toSet(), {'hidden', 'pausedUntil'});
     expect(data['hidden'], ['steps', 'sleep']);
-    expect(SharingSettings.fromJson(data), settings);
+    // A timestamp, so firestore.rules can compare it with the request time.
+    expect(data['pausedUntil'], Timestamp.fromDate(pause));
+    final later = FirestoreSharingRepository(db, uid: 'u1');
+    await later.load();
+    expect(later.settingsFor('u1'), settings);
 
     // Same value again: nothing to save or announce.
     await repo.update('u1', settings);
@@ -132,6 +136,55 @@ void main() {
     );
     expect(failing.settingsFor('u1'), const SharingSettings());
     expect(notified, 2); // shown, then reverted
+  });
+
+  test(
+    'an older ISO-string pause is read, then rewritten as a timestamp',
+    () async {
+      final pause = DateTime.utc(2026, 3, 12, 9);
+      await db.doc('users/u1/private/settings').set({
+        'hidden': ['sleep'],
+        'pausedUntil': pause.toIso8601String(),
+      });
+
+      await repo.load();
+
+      expect(repo.settingsFor('u1').pausedUntil, pause.toLocal());
+      final data = (await db.doc('users/u1/private/settings').get()).data()!;
+      expect(data['pausedUntil'], Timestamp.fromDate(pause));
+    },
+  );
+
+  test(
+    'refresh picks up a change saved elsewhere and announces it once',
+    () async {
+      await repo.load();
+      final other = FirestoreSharingRepository(db, uid: 'u1');
+      await other.update(
+        'u1',
+        const SharingSettings(hidden: {StatMetric.steps}),
+      );
+      var notified = 0;
+      repo.addListener(() => notified++);
+
+      await repo.refresh();
+      expect(repo.settingsFor('u1').hidden, {StatMetric.steps});
+      expect(notified, 1);
+
+      await repo.refresh(); // unchanged: nothing to announce
+      expect(notified, 1);
+    },
+  );
+
+  test('a slow refresh does not overwrite a change made meanwhile', () async {
+    await repo.load();
+    await db
+        .doc('users/u1/private/settings')
+        .set(const SharingSettings(hidden: {StatMetric.steps}).toJson());
+    final refreshing = repo.refresh();
+    await repo.update('u1', const SharingSettings(hidden: {}));
+    await refreshing;
+    expect(repo.settingsFor('u1').hidden, isEmpty);
   });
 
   test('deleting the profile deletes the sharing settings', () async {

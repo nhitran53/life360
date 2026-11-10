@@ -9,13 +9,15 @@ import 'sharing_repository.dart';
 /// [source] and hands them to [publisher] with their sharing settings.
 ///
 /// Runs when [sync] is called (after a health sync) and whenever the sharing
-/// settings change. It publishes nothing unless
-/// - the saved sharing settings have loaded ([SharingRepository.isLoaded]),
-///   so the private defaults are never mistaken for the user's choice, and
-/// - [source] is connected to a real health platform, so demo data is never
-///   published as the user's own.
-///
-/// While sharing is paused it deletes what's published, connected or not.
+/// settings change. Each run first re-reads the saved settings (another
+/// device may have changed them) and then
+/// - takes down everything the settings no longer allow
+///   ([FirestoreStatsPublisher.revoke]), which needs no health data, so it
+///   happens even when health is disconnected or unreadable, and
+/// - publishes new values only if the saved sharing settings have loaded
+///   ([SharingRepository.isLoaded]), so the private defaults are never
+///   mistaken for the user's choice, and [source] is connected to a real
+///   health platform, so demo data is never published as the user's own.
 ///
 /// Failures are swallowed (the next sync tries again). Errors can carry
 /// health details, so they're never logged.
@@ -70,13 +72,11 @@ class StatsSync {
   Future<void> _publishOnce() async {
     if (_disposed || !sharing.isLoaded) return;
     try {
+      await sharing.refresh();
+      if (_disposed) return;
       final settings = sharing.settingsFor(userId);
-      if (settings.isPaused(_clock())) {
-        // Paused: take down what's published even if health isn't connected.
-        await publisher.publish(const [], settings);
-        return;
-      }
-      if (!source.isConnected) return;
+      await publisher.revoke(settings);
+      if (settings.isPaused(_clock()) || !source.isConnected) return;
       final today = dateOnly(_clock());
       final days = await source.dailyStats(
         userId,

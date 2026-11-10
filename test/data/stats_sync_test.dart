@@ -115,6 +115,103 @@ void main() {
     await sync.sync();
     expect(await published(), ['2026-03-12']);
   });
+
+  group('revoking needs no health access', () {
+    Future<Map<String, dynamic>?> read(String key) async =>
+        (await db.doc('users/u1/daily/$key').get()).data();
+
+    Future<void> publishAll() async {
+      await sharing.update('u1', const SharingSettings(hidden: {}));
+      await sync.sync();
+      expect((await read('2026-03-12'))!['steps'], 4000);
+    }
+
+    test('hiding a metric while health is disconnected removes it', () async {
+      await publishAll();
+      source.connected = false;
+      await sharing.update(
+        'u1',
+        const SharingSettings(hidden: {StatMetric.steps}),
+      );
+      await sync.sync();
+      final data = (await read('2026-03-12'))!;
+      expect(data.containsKey('steps'), isFalse);
+    });
+
+    test('hiding a metric while the health read throws removes it', () async {
+      await publishAll();
+      source.fail = true;
+      await sharing.update(
+        'u1',
+        const SharingSettings(hidden: {StatMetric.steps}),
+      );
+      await sync.sync();
+      final data = (await read('2026-03-12'))!;
+      expect(data.containsKey('steps'), isFalse);
+    });
+
+    test(
+      'pausing while the health read throws deletes published days',
+      () async {
+        await publishAll();
+        source.fail = true;
+        await sharing.update(
+          'u1',
+          const SharingSettings().withPause(now.add(const Duration(days: 1))),
+        );
+        await sync.sync();
+        expect(await published(), isEmpty);
+      },
+    );
+
+    test('pausing later deletes days that left the 14-day window', () async {
+      await publishAll();
+      var later = now.add(const Duration(days: 20));
+      source.connected = false;
+      final laterSync = StatsSync(
+        source: source,
+        sharing: sharing,
+        publisher: FirestoreStatsPublisher(db, uid: 'u1', clock: () => later),
+        userId: 'u1',
+        clock: () => later,
+      );
+      await sharing.update(
+        'u1',
+        const SharingSettings().withPause(later.add(const Duration(days: 1))),
+      );
+      await laterSync.sync();
+      expect(await published(), isEmpty);
+    });
+  });
+
+  test(
+    'picks up settings changed from another device before publishing',
+    () async {
+      await sharing.load();
+      await sync.sync();
+      expect(
+        (await db.doc('users/u1/daily/2026-03-12').get()).data()!['steps'],
+        4000,
+      );
+
+      // Another session hides steps; this one's cached settings are stale.
+      final other = FirestoreSharingRepository(db, uid: 'u1');
+      await other.update(
+        'u1',
+        const SharingSettings(hidden: {StatMetric.steps}),
+      );
+      expect(sharing.settingsFor('u1').isShared(StatMetric.steps, now), isTrue);
+
+      await sync.sync();
+
+      expect(
+        sharing.settingsFor('u1').isShared(StatMetric.steps, now),
+        isFalse,
+      );
+      final data = (await db.doc('users/u1/daily/2026-03-12').get()).data()!;
+      expect(data.containsKey('steps'), isFalse);
+    },
+  );
 }
 
 class _NeverLoaded extends MockSharingRepository {

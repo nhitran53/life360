@@ -154,6 +154,95 @@ void main() {
     expect((await read('2026-03-12'))!['steps'], 200000);
   });
 
+  group('revoke (needs no health data)', () {
+    var current = now;
+    late FirestoreStatsPublisher clocked;
+
+    setUp(() {
+      current = now;
+      clocked = FirestoreStatsPublisher(db, uid: 'u1', clock: () => current);
+    });
+
+    test('pausing deletes days that already left the 14-day window', () async {
+      await clocked.publish([day(0)], const SharingSettings());
+      expect(await read('2026-03-12'), isNotNull);
+
+      // Two weeks later nothing re-published that day; it's out of the window.
+      current = now.add(const Duration(days: 20));
+      final paused = const SharingSettings().withPause(
+        current.add(const Duration(days: 1)),
+      );
+      await clocked.revoke(paused);
+
+      expect(await read('2026-03-12'), isNull);
+      expect((await db.collection('users/u1/daily').get()).docs, isEmpty);
+    });
+
+    test('hiding a metric deletes expired days too', () async {
+      await clocked.publish([day(0)], const SharingSettings());
+      current = now.add(const Duration(days: 20));
+      await clocked.revoke(const SharingSettings(hidden: {StatMetric.steps}));
+      expect(await read('2026-03-12'), isNull);
+    });
+
+    test(
+      'expired and future-dated days go even when nothing is revoked',
+      () async {
+        await db.doc('users/u1/daily/2026-02-01').set({
+          'date': '2026-02-01',
+          'steps': 5,
+        });
+        await db.doc('users/u1/daily/2026-04-01').set({
+          'date': '2026-04-01',
+          'steps': 5,
+        });
+        await clocked.publish([day(0)], const SharingSettings());
+        await clocked.revoke(const SharingSettings());
+        expect(await read('2026-02-01'), isNull);
+        expect(await read('2026-04-01'), isNull);
+        expect(await read('2026-03-12'), isNotNull);
+      },
+    );
+
+    test(
+      'a newly hidden metric is stripped from every day in the window',
+      () async {
+        await clocked.publish([
+          day(0),
+          day(5),
+        ], const SharingSettings(hidden: {}));
+
+        await clocked.revoke(const SharingSettings(hidden: {StatMetric.sleep}));
+
+        for (final key in ['2026-03-12', '2026-03-07']) {
+          final data = (await read(key))!;
+          expect(data.containsKey('sleep'), isFalse);
+          expect(data['steps'], 1000);
+          expect(data['screenTime'], 120);
+          expect(data['date'], key);
+          expect(data['updatedAt'], isNotNull);
+        }
+      },
+    );
+
+    test('a day left with no metric is deleted', () async {
+      await clocked.publish([day(0)], const SharingSettings());
+      await clocked.revoke(SharingSettings(hidden: StatMetric.values.toSet()));
+      expect(await read('2026-03-12'), isNull);
+    });
+
+    test('never adds data, and leaves a 0 that is shared alone', () async {
+      await db.doc('users/u1/daily/2026-03-12').set({
+        'date': '2026-03-12',
+        'steps': 0,
+      });
+      await clocked.revoke(const SharingSettings());
+      final data = (await read('2026-03-12'))!;
+      expect(data['steps'], 0);
+      expect(data.keys.toSet(), {'date', 'steps'});
+    });
+  });
+
   test('dayFields has the same keys as the metric names', () {
     expect(
       FirestoreStatsPublisher.dayFields(

@@ -15,6 +15,10 @@ abstract interface class SharingRepository implements Listenable {
   /// the private defaults.
   bool get isLoaded;
 
+  /// Re-reads the saved settings, so a change made on another device is
+  /// picked up. Never throws; unreadable settings leave the current ones.
+  Future<void> refresh();
+
   /// The settings for [userId]; defaults for anyone who never changed them.
   SharingSettings settingsFor(String userId);
 
@@ -32,6 +36,9 @@ class MockSharingRepository extends ChangeNotifier
 
   @override
   bool get isLoaded => true;
+
+  @override
+  Future<void> refresh() async {}
 
   @override
   SharingSettings settingsFor(String userId) =>
