@@ -20,10 +20,6 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    function doc(path) {
-      return /databases/$(database)/documents/$(path);
-    }
-
     function validName(name) {
       return name is string && name.trim().size() > 0 && name.size() <= 30;
     }
@@ -56,8 +52,8 @@ service cloud.firestore {
         && validUsername(request.resource.data.username)
         && validFriendCode(request.resource.data.friendCode)
         && request.resource.data.createdAt == request.time
-        && getAfter(doc('usernames/' + request.resource.data.username)).data.uid == uid
-        && getAfter(doc('friendCodes/' + request.resource.data.friendCode)).data.uid == uid;
+        && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid
+        && getAfter(/databases/$(database)/documents/friendCodes/$(request.resource.data.friendCode)).data.uid == uid;
 
       // Username and friend code can't change (they're claimed elsewhere).
       allow update: if isMe(uid)
@@ -80,7 +76,7 @@ service cloud.firestore {
         && validUsername(username)
         && request.resource.data.keys().hasOnly(['uid'])
         && request.resource.data.uid == request.auth.uid
-        && getAfter(doc('users/' + request.auth.uid)).data.username == username;
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
 
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
@@ -92,7 +88,7 @@ service cloud.firestore {
         && validFriendCode(code)
         && request.resource.data.keys().hasOnly(['uid'])
         && request.resource.data.uid == request.auth.uid
-        && getAfter(doc('users/' + request.auth.uid)).data.friendCode == code;
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.friendCode == code;
 
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
