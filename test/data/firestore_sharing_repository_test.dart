@@ -23,7 +23,32 @@ void main() {
     expect(repo.settingsFor('u1'), const SharingSettings());
     await repo.load();
     expect(repo.settingsFor('u1').hidden, SharingSettings.defaultHidden);
-    expect((await db.doc('users/u1/private/settings').get()).exists, isFalse);
+  });
+
+  test('load saves the default settings when there is no document', () async {
+    await repo.load();
+    final doc = await db.doc('users/u1/private/settings').get();
+    expect(doc.data(), {
+      'hidden': ['sleep', 'screenTime'],
+      'pausedUntil': null,
+    });
+  });
+
+  test('load keeps settings that were already saved', () async {
+    await db.doc('users/u1/private/settings').set({
+      'hidden': ['steps'],
+      'pausedUntil': null,
+    });
+    await repo.load();
+    expect(repo.settingsFor('u1').hidden, {StatMetric.steps});
+    final doc = await db.doc('users/u1/private/settings').get();
+    expect(doc.data()!['hidden'], ['steps']);
+  });
+
+  test('a failed default create leaves the settings not loaded', () async {
+    final failing = FirestoreSharingRepository(_NoCreateDb(), uid: 'u1');
+    await failing.load();
+    expect(failing.isLoaded, isFalse);
   });
 
   test('isLoaded is false until the saved settings were read', () async {
@@ -248,5 +273,16 @@ void main() {
 class _BrokenDb extends Fake implements FirebaseFirestore {
   @override
   CollectionReference<Map<String, dynamic>> collection(String path) =>
+      throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
+}
+
+/// Reads work, but creating the default document fails.
+class _NoCreateDb extends FakeFirebaseFirestore {
+  @override
+  Future<T> runTransaction<T>(
+    TransactionHandler<T> transactionHandler, {
+    Duration timeout = const Duration(seconds: 30),
+    int maxAttempts = 5,
+  }) async =>
       throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
 }

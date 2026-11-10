@@ -33,7 +33,7 @@ class FirestoreSharingRepository extends ChangeNotifier
 
   var _loaded = false;
 
-  /// True after [load] read the document (or found none), or once the user
+  /// True after [load] read the document (or saved the defaults), or once the user
   /// saved a change. A failed [load] leaves it false.
   @override
   bool get isLoaded => _loaded;
@@ -68,12 +68,19 @@ class FirestoreSharingRepository extends ChangeNotifier
   Future<void> _save(SharingSettings settings) async =>
       _doc.set(_toDoc(settings));
 
-  /// Reads the saved settings. A missing or unreadable document keeps the
-  /// private defaults.
+  /// Reads the saved settings. A failed read keeps the private defaults and
+  /// leaves [isLoaded] false (a later [refresh] tries again).
+  ///
+  /// When there is no document yet, the default settings are saved, because
+  /// firestore.rules rejects published stats for a user with no settings
+  /// document. The create happens in a transaction that only writes if the
+  /// document is still absent, so settings another device saved meanwhile
+  /// are used instead of overwritten. If the create fails the load counts as
+  /// failed, so nothing is published until it works.
   Future<void> load() async {
     final Map<String, dynamic>? data;
     try {
-      data = (await _doc.get()).data();
+      data = await _readOrCreate();
     } on FirebaseException {
       return;
     }
@@ -92,6 +99,19 @@ class FirestoreSharingRepository extends ChangeNotifier
         // Tried again on the next change.
       }
     }
+  }
+
+  /// The saved settings, or null after saving the defaults because there
+  /// were none.
+  Future<Map<String, dynamic>?> _readOrCreate() async {
+    final existing = (await _doc.get()).data();
+    if (existing != null) return existing;
+    return _db.runTransaction((transaction) async {
+      final current = (await transaction.get(_doc)).data();
+      if (current != null) return current;
+      transaction.set(_doc, _toDoc(const SharingSettings()));
+      return null;
+    });
   }
 
   /// Picks up settings saved from another device. Skipped until the first
