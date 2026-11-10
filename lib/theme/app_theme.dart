@@ -19,6 +19,11 @@ abstract final class AppDepth {
 abstract final class AppTheme {
   static const fontFamily = 'Nunito';
 
+  static OutlineInputBorder _inputBorder(Color color) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        borderSide: BorderSide(color: color, width: 2),
+      );
+
   static ThemeData light() {
     const scheme = ColorScheme.light(
       primary: AppColors.primary,
@@ -79,6 +84,31 @@ abstract final class AppTheme {
         ),
       ),
       dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 2),
+      // Small green text needs the darker green to stay readable.
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: AppColors.primaryText),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surfaceSunken,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        hintStyle: const TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          color: AppColors.muted,
+        ),
+        errorStyle: const TextStyle(
+          fontFamily: fontFamily,
+          fontWeight: FontWeight.w700,
+          color: AppColors.redText,
+        ),
+        border: _inputBorder(AppColors.border),
+        enabledBorder: _inputBorder(AppColors.border),
+        focusedBorder: _inputBorder(AppColors.blue),
+        errorBorder: _inputBorder(AppColors.red),
+        focusedErrorBorder: _inputBorder(AppColors.red),
+      ),
       progressIndicatorTheme:
           const ProgressIndicatorThemeData(color: AppColors.primary),
       snackBarTheme: SnackBarThemeData(

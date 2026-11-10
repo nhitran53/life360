@@ -27,6 +27,68 @@ class DailyGoals {
   final int activeCalories;
   final int screenTimeMinutes;
 
+  DailyGoals copyWith({
+    int? steps,
+    int? sleepMinutes,
+    int? workoutMinutes,
+    int? activeCalories,
+    int? screenTimeMinutes,
+  }) => DailyGoals(
+    steps: steps ?? this.steps,
+    sleepMinutes: sleepMinutes ?? this.sleepMinutes,
+    workoutMinutes: workoutMinutes ?? this.workoutMinutes,
+    activeCalories: activeCalories ?? this.activeCalories,
+    screenTimeMinutes: screenTimeMinutes ?? this.screenTimeMinutes,
+  );
+
+  /// A copy with [metric]'s target set to [value].
+  DailyGoals withTarget(StatMetric metric, int value) => switch (metric) {
+    StatMetric.steps => copyWith(steps: value),
+    StatMetric.sleep => copyWith(sleepMinutes: value),
+    StatMetric.workout => copyWith(workoutMinutes: value),
+    StatMetric.calories => copyWith(activeCalories: value),
+    StatMetric.screenTime => copyWith(screenTimeMinutes: value),
+  };
+
+  /// Missing keys fall back to the defaults.
+  factory DailyGoals.fromJson(Map<String, dynamic> json) {
+    const d = DailyGoals();
+    return DailyGoals(
+      steps: json['steps'] as int? ?? d.steps,
+      sleepMinutes: json['sleepMinutes'] as int? ?? d.sleepMinutes,
+      workoutMinutes: json['workoutMinutes'] as int? ?? d.workoutMinutes,
+      activeCalories: json['activeCalories'] as int? ?? d.activeCalories,
+      screenTimeMinutes:
+          json['screenTimeMinutes'] as int? ?? d.screenTimeMinutes,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'steps': steps,
+    'sleepMinutes': sleepMinutes,
+    'workoutMinutes': workoutMinutes,
+    'activeCalories': activeCalories,
+    'screenTimeMinutes': screenTimeMinutes,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is DailyGoals &&
+      other.steps == steps &&
+      other.sleepMinutes == sleepMinutes &&
+      other.workoutMinutes == workoutMinutes &&
+      other.activeCalories == activeCalories &&
+      other.screenTimeMinutes == screenTimeMinutes;
+
+  @override
+  int get hashCode => Object.hash(
+    steps,
+    sleepMinutes,
+    workoutMinutes,
+    activeCalories,
+    screenTimeMinutes,
+  );
+
   int target(StatMetric metric) => switch (metric) {
     StatMetric.steps => steps,
     StatMetric.sleep => sleepMinutes,
