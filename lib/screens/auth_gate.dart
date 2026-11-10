@@ -47,9 +47,17 @@ class _AuthGateState extends State<AuthGate> {
     return _services!;
   }
 
+  /// Stops publishing and forgets the services, so signing in again (even
+  /// as the same user) starts with fresh ones on the new session.
+  void _releaseServices() {
+    _services?.dispose();
+    _services = null;
+    _servicesFor = null;
+  }
+
   @override
   void dispose() {
-    _services?.dispose();
+    _releaseServices();
     super.dispose();
   }
 
@@ -66,6 +74,8 @@ class _AuthGateState extends State<AuthGate> {
       });
     }
     _shown = status;
+
+    if (status != AccountStatus.ready) _releaseServices();
 
     return switch (status) {
       AccountStatus.loading => const Scaffold(
