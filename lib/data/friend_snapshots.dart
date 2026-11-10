@@ -13,12 +13,6 @@ Future<FriendSnapshot> loadFriendSnapshot(
   required DateTime now,
 }) async {
   final today = dateOnly(now);
-  final settings = sharing.settingsFor(friend.id);
-  final hidden = {
-    for (final m in StatMetric.values)
-      if (!settings.isShared(m, now)) m,
-  };
-
   // Far enough back for any realistic streak in the mock data.
   final recent = await stats.dailyStats(
     friend.id,
@@ -26,6 +20,13 @@ Future<FriendSnapshot> loadFriendSnapshot(
     to: today,
   );
   final week = await stats.weeklySummary(friend.id, weekOf: now);
+
+  // After reading the stats: what a friend shares is learned from them.
+  final settings = sharing.settingsFor(friend.id);
+  final hidden = {
+    for (final m in StatMetric.values)
+      if (!settings.isShared(m, now)) m,
+  };
 
   // A streak is built from steps and workouts. With one of them private its
   // value reads as 0 here, so the streak only counts what they share.

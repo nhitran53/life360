@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import 'firestore_stats_publisher.dart';
 import 'friends_repository.dart';
+import 'published_sharing_repository.dart';
 import 'stats_repository.dart';
 
 /// [StatsRepository] that reads friends' published daily stats from
@@ -10,7 +11,9 @@ import 'stats_repository.dart';
 /// current user's own stats come from [own].
 ///
 /// A friend's document only has the metrics they share, so a missing key
-/// reads as 0 here. Screens check the sharing settings to show 🔒 instead.
+/// reads as 0 here, while a present key is a real value (0 included). Which
+/// keys were present is handed to [published], which is how the app knows
+/// what each friend shares (their settings aren't readable).
 /// Firestore only lets accepted friends read these documents. A failed or
 /// refused read returns no days.
 class FirestoreStatsRepository implements StatsRepository {
@@ -18,12 +21,16 @@ class FirestoreStatsRepository implements StatsRepository {
     this._db, {
     required this.own,
     required this._friends,
+    this.published,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
   final FirebaseFirestore _db;
   final FriendsRepository _friends;
   final DateTime Function() _clock;
+
+  /// Told which metrics each friend's published days contain.
+  final PublishedSharingRepository? published;
 
   /// Serves the current user's stats (e.g. the demo data before health is
   /// connected).
@@ -49,21 +56,35 @@ class FirestoreStatsRepository implements StatsRepository {
           .where('date', isLessThanOrEqualTo: dateKey(to))
           .get();
     } on FirebaseException {
+      published?.record(userId, const {});
       return const [];
     }
-    return [
-      for (final doc in snapshot.docs) ?_parse(userId, doc.id, doc.data()),
+    final shared = <StatMetric>{};
+    final days = [
+      for (final doc in snapshot.docs)
+        ?_parse(userId, doc.id, doc.data(), shared),
     ]..sort((a, b) => a.date.compareTo(b.date));
+    published?.record(userId, shared);
+    return days;
   }
 
   /// Null for a document that isn't a valid day (its id must be the date).
-  DailyStats? _parse(String userId, String id, Map<String, dynamic> data) {
+  /// Adds the metrics the document has a valid value for to [shared].
+  DailyStats? _parse(
+    String userId,
+    String id,
+    Map<String, dynamic> data,
+    Set<StatMetric> shared,
+  ) {
     final date = DateTime.tryParse(id);
     if (date == null || dateKey(date) != id) return null;
-    int value(StatMetric m) => switch (data[m.name]) {
-      final int n when n >= 0 => n,
-      _ => 0,
-    };
+    int value(StatMetric m) {
+      final n = data[m.name];
+      if (n is! int || n < 0) return 0;
+      shared.add(m);
+      return n;
+    }
+
     return DailyStats(
       userId: userId,
       date: date,

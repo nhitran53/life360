@@ -20,6 +20,7 @@ import 'data/mock_data.dart';
 import 'data/mock_friends_repository.dart';
 import 'data/manual_screen_time_repository.dart';
 import 'data/mock_stats_repository.dart';
+import 'data/published_sharing_repository.dart';
 import 'data/screen_time_log.dart';
 import 'data/sharing_repository.dart';
 import 'data/sharing_stats_repository.dart';
@@ -86,9 +87,19 @@ class AppServices {
           );
     final publishing = statsDb != null && userId != null && sharing != null;
     StatsSync? sync;
+    // Friends' settings are private to them: with Firestore, what they share
+    // is read off their published days instead.
+    final published = statsDb == null
+        ? null
+        : PublishedSharingRepository(sharing ?? MockSharingRepository());
     final StatsRepository fallback = statsDb == null
         ? mockStats
-        : FirestoreStatsRepository(statsDb, own: mockStats, friends: friends);
+        : FirestoreStatsRepository(
+            statsDb,
+            own: mockStats,
+            friends: friends,
+            published: published,
+          );
     final health = HealthStatsRepository(
       source: source,
       fallback: fallback,
@@ -99,7 +110,7 @@ class AppServices {
     final services = AppServices(
       friends: friends,
       stats: health,
-      sharing: sharing,
+      sharing: published ?? sharing,
     );
     if (publishing) {
       sync = services._sync = StatsSync(

@@ -2,6 +2,7 @@ import '../models/models.dart';
 import 'connectable_stats_repository.dart';
 import 'friends_repository.dart';
 import 'health/health_source.dart';
+import 'published_sharing_repository.dart';
 import 'sharing_repository.dart';
 
 /// Wraps a stats repository so everything friends can see respects each
@@ -14,6 +15,9 @@ import 'sharing_repository.dart';
 ///   zeroed. Screens should check [SharingRepository.settingsFor] and show 🔒
 ///   rather than the 0.
 /// - Paused users are left off every board, XP included.
+///
+/// Settings are looked up after the stats are read, because for friends
+/// they come from what was published (see [PublishedSharingRepository]).
 ///
 /// Your own stats are never filtered when you read them yourself.
 ///
@@ -103,9 +107,13 @@ class SharingStatsRepository implements ConnectableStatsRepository {
     Iterable<String>? userIds,
   }) async {
     final now = _clock();
-    final people = (await _people(userIds))
-        .where((p) => sharing.settingsFor(p.id).isShared(metric, now));
-    return rankLeaderboard(metric, await _summaries(people, weekOf));
+    // Rank after reading: for friends, who shares what is learned from the
+    // stats they published (see PublishedSharingRepository).
+    final summaries = await _summaries(await _people(userIds), weekOf);
+    return rankLeaderboard(metric, {
+      for (final e in summaries.entries)
+        if (sharing.settingsFor(e.key.id).isShared(metric, now)) e.key: e.value,
+    });
   }
 
   @override
@@ -114,9 +122,11 @@ class SharingStatsRepository implements ConnectableStatsRepository {
     Iterable<String>? userIds,
   }) async {
     final now = _clock();
-    final people = (await _people(userIds))
-        .where((p) => !sharing.settingsFor(p.id).isPaused(now));
-    return rankLeaderboardByXp(await _summaries(people, weekOf));
+    final summaries = await _summaries(await _people(userIds), weekOf);
+    return rankLeaderboardByXp({
+      for (final e in summaries.entries)
+        if (!sharing.settingsFor(e.key.id).isPaused(now)) e.key: e.value,
+    });
   }
 
   /// The current user plus their friends, or plus just [userIds] when given
