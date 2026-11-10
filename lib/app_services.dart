@@ -49,8 +49,13 @@ class AppServices {
   /// Real health data on Android/iOS; on other platforms (no health store)
   /// a fake source seeded with mock data so the UI is still demo-able.
   /// Pass [friends] to use real friends (signed in through Firebase);
-  /// otherwise everyone comes from the mock data.
-  factory AppServices.defaults({FriendsRepository? friends}) {
+  /// otherwise everyone comes from the mock data. Pass [sharing] to save
+  /// the user's sharing settings (Firebase session); otherwise they're
+  /// in-memory and reset on every launch.
+  factory AppServices.defaults({
+    FriendsRepository? friends,
+    SharingRepository? sharing,
+  }) {
     friends ??= MockFriendsRepository();
     final mockStats = MockStatsRepository(friends: friends);
     final onPhone =
@@ -77,7 +82,7 @@ class AppServices {
     // Reconnect in the background so other screens see health stats too;
     // My Stats waits for the same (shared) future.
     unawaited(health.restoreConnection());
-    return AppServices(friends: friends, stats: health);
+    return AppServices(friends: friends, stats: health, sharing: sharing);
   }
 
   final FriendsRepository friends;

@@ -36,7 +36,10 @@ class _AuthGateState extends State<AuthGate> {
     final id = session.profile?.id;
     if (_services == null || _servicesFor != id) {
       _servicesFor = id;
-      _services = AppServices.defaults(friends: session.friends);
+      _services = AppServices.defaults(
+        friends: session.friends,
+        sharing: session.sharing,
+      );
     }
     return _services!;
   }

@@ -3,7 +3,8 @@ rules_version = '2';
 // Friend 360 Firestore rules. Anything not allowed here is denied.
 //
 // users/{uid}                 public profile: any signed-in user can read
-// users/{uid}/private/{doc}   goals etc.: only the owner
+// users/{uid}/private/goals    daily goals: only the owner
+// users/{uid}/private/settings sharing settings: only the owner
 // usernames/{username}        {uid} claim that keeps usernames unique
 // friendships/{a}_{b}         friend requests and friends, one per pair
 // friendCodes/{code}          {uid} claim that keeps friend codes unique
@@ -35,6 +36,13 @@ service cloud.firestore {
         && name.matches('^[a-z][a-z0-9_.]{2,19}$')
         && !name.matches('.*[.][.].*')
         && !name.matches('.*[.]$');
+    }
+
+    // Same names as StatMetric in lib/models/stat_metric.dart.
+    function validHidden(hidden) {
+      return hidden is list
+        && hidden.size() <= 5
+        && hidden.hasOnly(['steps', 'sleep', 'workout', 'calories', 'screenTime']);
     }
 
     // Matches friendshipId() in lib/data/firestore_friends_repository.dart.
@@ -71,8 +79,20 @@ service cloud.firestore {
 
       allow delete: if isMe(uid);
 
-      match /private/{docId} {
+      match /private/goals {
         allow read, write: if isMe(uid);
+      }
+
+      // Same shape as SharingSettings.toJson() in lib/models/sharing_settings.dart.
+      match /private/settings {
+        allow read, delete: if isMe(uid);
+        allow create, update: if isMe(uid)
+          && request.resource.data.keys().hasOnly(['hidden', 'pausedUntil'])
+          && request.resource.data.keys().hasAll(['hidden', 'pausedUntil'])
+          && validHidden(request.resource.data.hidden)
+          && (request.resource.data.pausedUntil == null
+              || (request.resource.data.pausedUntil is string
+                  && request.resource.data.pausedUntil.size() <= 40));
       }
     }
 

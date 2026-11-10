@@ -6,6 +6,7 @@ import '../models/models.dart';
 import 'auth_repository.dart';
 import 'friends_repository.dart';
 import 'profile_repository.dart';
+import 'sharing_repository.dart';
 
 enum AccountStatus {
   /// Checking whether someone is already signed in.
@@ -24,6 +25,7 @@ class AccountSession extends ChangeNotifier {
     required this.auth,
     required this.profiles,
     this.friendsFor,
+    this.sharingFor,
   }) {
     _sub = auth.authStateChanges().listen(_onAuthChanged);
   }
@@ -35,7 +37,16 @@ class AccountSession extends ChangeNotifier {
   /// (mock accounts) means screens keep using the mock friends.
   final FriendsRepository Function(UserProfile me)? friendsFor;
 
+  /// Builds the saved sharing settings for a signed-in profile. Null (mock
+  /// accounts) means settings stay in memory.
+  final SharingRepository Function(UserProfile me)? sharingFor;
+
   FriendsRepository? _friends;
+  SharingRepository? _sharing;
+
+  /// The user's saved sharing settings once [status] is
+  /// [AccountStatus.ready], or null when there's no backend (mock accounts).
+  SharingRepository? get sharing => _sharing;
 
   /// Your real friends once [status] is [AccountStatus.ready], or null when
   /// there's no backend (mock accounts).
@@ -67,6 +78,7 @@ class AccountSession extends ChangeNotifier {
     if (user == null) {
       _profile = null;
       _friends = null;
+      _sharing = null;
       _goals = const DailyGoals();
       _set(AccountStatus.signedOut);
       return;
@@ -76,6 +88,7 @@ class AccountSession extends ChangeNotifier {
     if (generation != _generation || _disposed) return;
     _profile = profile;
     _friends = profile == null ? null : friendsFor?.call(profile);
+    _sharing = profile == null ? null : sharingFor?.call(profile);
     _goals = goals;
     _set(profile == null ? AccountStatus.needsProfile : AccountStatus.ready);
   }
@@ -103,6 +116,7 @@ class AccountSession extends ChangeNotifier {
       goals: goals,
     );
     _friends = friendsFor?.call(profile);
+    _sharing = sharingFor?.call(profile);
     _goals = goals;
     _set(AccountStatus.ready);
   }

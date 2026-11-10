@@ -10,6 +10,8 @@ import 'profile_repository.dart';
 /// Layout (see firestore.rules):
 /// - `users/{uid}`: public profile (name, @username, avatar, friend code)
 /// - `users/{uid}/private/goals`: daily goals, only the owner can read them
+/// - `users/{uid}/private/settings`: sharing settings (see
+///   FirestoreSharingRepository), deleted along with the profile
 /// - `friendships/...`: deleted along with the profile (see
 ///   FirestoreFriendsRepository)
 /// - `usernames/{username}` and `friendCodes/{code}`: `{uid}` claims that
@@ -29,6 +31,8 @@ class FirestoreProfileRepository implements ProfileRepository {
       _db.collection('users').doc(uid);
   DocumentReference<Map<String, dynamic>> _goals(String uid) =>
       _user(uid).collection('private').doc('goals');
+  DocumentReference<Map<String, dynamic>> _sharing(String uid) =>
+      _user(uid).collection('private').doc('settings');
   DocumentReference<Map<String, dynamic>> _username(String username) =>
       _db.collection('usernames').doc(username);
   DocumentReference<Map<String, dynamic>> _friendCode(String code) =>
@@ -110,7 +114,9 @@ class FirestoreProfileRepository implements ProfileRepository {
         .collection('friendships')
         .where('users', arrayContains: uid)
         .get();
-    final batch = _db.batch()..delete(_goals(uid));
+    final batch = _db.batch()
+      ..delete(_goals(uid))
+      ..delete(_sharing(uid));
     for (final f in friendships.docs) {
       batch.delete(f.reference);
     }
