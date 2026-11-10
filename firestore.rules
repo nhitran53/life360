@@ -5,9 +5,15 @@ rules_version = '2';
 // users/{uid}                 public profile: any signed-in user can read
 // users/{uid}/private/goals    daily goals: only the owner
 // users/{uid}/private/settings sharing settings: only the owner
+// users/{uid}/daily/{yyyy-MM-dd} published daily totals: the owner and
+//                              their accepted friends read, only the owner writes
 // usernames/{username}        {uid} claim that keeps usernames unique
 // friendships/{a}_{b}         friend requests and friends, one per pair
 // friendCodes/{code}          {uid} claim that keeps friend codes unique
+//
+// Daily totals only contain the metrics the owner chose to share: the app
+// leaves hidden ones out. These rules can't check that (settings are
+// owner-only), so they only accept well-formed, in-range documents.
 //
 // Claims are only accepted together with the matching profile (same
 // transaction), so nobody can grab usernames or codes they don't use.
@@ -49,6 +55,24 @@ service cloud.firestore {
     function isPairId(pairId, a, b) {
       return (a < b && pairId == a + '_' + b)
         || (b < a && pairId == b + '_' + a);
+    }
+
+    // Same pair id as friendshipId(): the lower uid first.
+    function areFriends(a, b) {
+      let pairId = a < b ? a + '_' + b : b + '_' + a;
+      let path = /databases/$(database)/documents/friendships/$(pairId);
+      return exists(path) && get(path).data.status == 'accepted';
+    }
+
+    // Day documents are named like dateKey() in lib/models/dates.dart.
+    function validDay(day) {
+      return day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // A metric is optional (hidden ones are left out) but never negative or huge.
+    function validCount(data, key, max) {
+      return !(key in data)
+        || (data[key] is int && data[key] >= 0 && data[key] <= max);
     }
 
     // Same alphabet as generateFriendCode() in lib/models/account.dart.
@@ -93,6 +117,27 @@ service cloud.firestore {
           && (request.resource.data.pausedUntil == null
               || (request.resource.data.pausedUntil is string
                   && request.resource.data.pausedUntil.size() <= 40));
+      }
+
+      // Limits match FirestoreStatsPublisher.maxValues. Keys are StatMetric names.
+      match /daily/{day} {
+        // Queries on users/{uid}/daily are allowed to the same people.
+        allow read: if isMe(uid) || (signedIn() && areFriends(request.auth.uid, uid));
+
+        allow create, update: if isMe(uid)
+          && validDay(day)
+          && request.resource.data.keys().hasOnly(
+               ['date', 'steps', 'sleep', 'workout', 'calories', 'screenTime', 'updatedAt'])
+          && request.resource.data.keys().hasAll(['date', 'updatedAt'])
+          && request.resource.data.date == day
+          && request.resource.data.updatedAt == request.time
+          && validCount(request.resource.data, 'steps', 200000)
+          && validCount(request.resource.data, 'sleep', 1440)
+          && validCount(request.resource.data, 'workout', 1440)
+          && validCount(request.resource.data, 'calories', 20000)
+          && validCount(request.resource.data, 'screenTime', 1440);
+
+        allow delete: if isMe(uid);
       }
     }
 
