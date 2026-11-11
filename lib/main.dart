@@ -66,10 +66,10 @@ class Friend360App extends StatefulWidget {
 class _Friend360AppState extends State<Friend360App> {
   late final AccountSession _session =
       widget.session ??
-      (_ownSession = AccountSession(
-        auth: MockAuthRepository(),
-        profiles: MockProfileRepository(),
-      ));
+          (_ownSession = AccountSession(
+            auth: MockAuthRepository(),
+            profiles: MockProfileRepository(),
+          ));
   AccountSession? _ownSession;
 
   @override
@@ -137,6 +137,8 @@ class _HomeScreenState extends State<HomeScreen>
     final text = Theme.of(context).textTheme;
 
     return Scaffold(
+      // Same light green as the Circle screen.
+      backgroundColor: AppColors.primaryTint,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(
@@ -160,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 12),
                     Text(
                       'Share your steps, sleep and screen time.\n'
-                      'See who wins the week.',
+                          'See who wins the week.',
                       textAlign: TextAlign.center,
                       style: text.bodyLarge?.copyWith(color: AppColors.inkSoft),
                     ),
