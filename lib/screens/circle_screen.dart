@@ -22,6 +22,9 @@ import 'privacy_screen.dart';
 // live pulse map of your circle and today's totals
 // ---------------------------------------------------------------------------
 
+/// Thickness of the green outlines around the boxes on the Circle home.
+const _outline = 2.5;
+
 class CircleScreen extends StatefulWidget {
   const CircleScreen({
     super.key,
@@ -258,7 +261,7 @@ class _CircleLink extends StatelessWidget {
       color: CircleColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.primarySoft, width: 1.5),
+        side: const BorderSide(color: AppColors.primarySoft, width: _outline),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -318,10 +321,10 @@ class _Header extends StatelessWidget {
               button: true,
               hint: 'Switch or create a family',
               child: Material(
-                color: AppColors.primary,
+                color: CircleColors.surface,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(22),
-                  side: const BorderSide(color: AppColors.primaryDark),
+                  side: const BorderSide(color: CircleColors.border),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
@@ -336,7 +339,6 @@ class _Header extends StatelessWidget {
                           '$circleAssets/icon_users.svg',
                           width: 16,
                           height: 16,
-                          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
                         ),
                         const SizedBox(width: 8),
                         Flexible(
@@ -345,8 +347,8 @@ class _Header extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              color: CircleColors.ink,
                             ),
                           ),
                         ),
@@ -355,7 +357,6 @@ class _Header extends StatelessWidget {
                           '$circleAssets/icon_chevron_down.svg',
                           width: 14,
                           height: 14,
-                          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
                         ),
                       ],
                     ),
@@ -424,7 +425,7 @@ class _PulseMap extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primarySoft,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.primary, width: 2),
+        border: Border.all(color: AppColors.primary, width: _outline + 0.5),
       ),
       alignment: Alignment.center,
       child: SizedBox(
@@ -664,7 +665,7 @@ class _TogetherToday extends StatelessWidget {
       decoration: BoxDecoration(
         color: CircleColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primarySoft, width: 1.5),
+        border: Border.all(color: AppColors.primarySoft, width: _outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,9 +746,13 @@ class _EmptyFamily extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CircleCard(
-      radius: 18,
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: CircleColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primarySoft, width: _outline),
+      ),
       child: Row(
         children: [
           Container(
@@ -812,7 +817,7 @@ class _MemberRow extends StatelessWidget {
       color: CircleColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: AppColors.primarySoft, width: 1.5),
+        side: const BorderSide(color: AppColors.primarySoft, width: _outline),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
