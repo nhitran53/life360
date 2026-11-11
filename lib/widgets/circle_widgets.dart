@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../theme/app_colors.dart';
 import '../theme/circle_colors.dart';
 
 // ---------------------------------------------------------------------------
@@ -259,7 +260,9 @@ class CircleTabBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       decoration: const BoxDecoration(
         color: CircleColors.surface,
-        border: Border(top: BorderSide(color: CircleColors.border)),
+        border: Border(
+          top: BorderSide(color: AppColors.primarySoft, width: 2),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -315,14 +318,31 @@ class _Tab extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircleSvg(active ? activeIcon : inactiveIcon, size: 22),
+              // Active tab: green pill behind a white icon.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+                decoration: BoxDecoration(
+                  color: active ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: SvgPicture.asset(
+                  '$circleAssets/${active ? activeIcon : inactiveIcon}.svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: active
+                      ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
+                      : null,
+                ),
+              ),
               const SizedBox(height: 3),
               Text(
                 _labels[tab]!,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: active ? FontWeight.w800 : FontWeight.w700,
-                  color: active ? CircleColors.ink : CircleColors.muted,
+                  color: active ? AppColors.primaryText : CircleColors.muted,
                 ),
               ),
             ],

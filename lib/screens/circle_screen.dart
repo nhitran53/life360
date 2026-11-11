@@ -6,6 +6,7 @@ import '../data/account_session.dart';
 import '../data/family_store.dart';
 import '../data/mock_circle.dart';
 import '../models/daily_goals.dart';
+import '../theme/app_colors.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
 import '../widgets/family_switcher.dart';
@@ -143,7 +144,8 @@ class _CircleScreenState extends State<CircleScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: CircleColors.background,
+      // Same green family as the home screen.
+      backgroundColor: AppColors.primaryTint,
       bottomNavigationBar: CircleTabBar(active: _tab, onSelect: _selectTab),
       body: SafeArea(
         bottom: false,
@@ -256,16 +258,24 @@ class _CircleLink extends StatelessWidget {
       color: CircleColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: CircleColors.border),
+        side: const BorderSide(color: AppColors.primarySoft, width: 1.5),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              Icon(icon, size: 20, color: CircleColors.ink),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 19, color: Colors.white),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -279,7 +289,7 @@ class _CircleLink extends StatelessWidget {
               ),
               const Icon(
                 Icons.chevron_right_rounded,
-                color: CircleColors.muted,
+                color: AppColors.primaryText,
               ),
             ],
           ),
@@ -308,10 +318,10 @@ class _Header extends StatelessWidget {
               button: true,
               hint: 'Switch or create a family',
               child: Material(
-                color: CircleColors.surface,
+                color: AppColors.primary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(22),
-                  side: const BorderSide(color: CircleColors.border),
+                  side: const BorderSide(color: AppColors.primaryDark),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
@@ -326,6 +336,7 @@ class _Header extends StatelessWidget {
                           '$circleAssets/icon_users.svg',
                           width: 16,
                           height: 16,
+                          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
                         ),
                         const SizedBox(width: 8),
                         Flexible(
@@ -334,8 +345,8 @@ class _Header extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: CircleColors.ink,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
                           ),
                         ),
@@ -344,6 +355,7 @@ class _Header extends StatelessWidget {
                           '$circleAssets/icon_chevron_down.svg',
                           width: 14,
                           height: 14,
+                          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
                         ),
                       ],
                     ),
@@ -410,8 +422,9 @@ class _PulseMap extends StatelessWidget {
       height: 248,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: CircleColors.mapBackground,
+        color: AppColors.primarySoft,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.primary, width: 2),
       ),
       alignment: Alignment.center,
       child: SizedBox(
@@ -451,7 +464,7 @@ class _PulseMap extends StatelessWidget {
                       ? CircleColors.alert
                       : member.idle
                       ? CircleColors.idle
-                      : CircleColors.mapBackground,
+                      : AppColors.primarySoft,
                   badge: member.idle
                       ? _TextBadge(
                     text: member.idleFor == null
@@ -495,7 +508,7 @@ class _MapMember extends StatelessWidget {
     required this.color,
     required this.badge,
     this.size = 44,
-    this.ringColor = CircleColors.mapBackground,
+    this.ringColor = AppColors.primarySoft,
   });
 
   final String initial;
@@ -646,9 +659,13 @@ class _TogetherToday extends StatelessWidget {
       color: CircleColors.secondary,
     );
 
-    return CircleCard(
-      radius: 20,
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: CircleColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primarySoft, width: 1.5),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -686,8 +703,8 @@ class _TogetherToday extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: CircleColors.secondary,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primaryText,
                   ),
                 ),
               ),
@@ -695,18 +712,18 @@ class _TogetherToday extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Container(
-            height: 8,
+            height: 12,
             decoration: BoxDecoration(
-              color: CircleColors.progressTrack,
-              borderRadius: BorderRadius.circular(4),
+              color: AppColors.primaryTint,
+              borderRadius: BorderRadius.circular(6),
             ),
             alignment: Alignment.centerLeft,
             child: FractionallySizedBox(
               widthFactor: progress,
               child: Container(
                 decoration: BoxDecoration(
-                  color: CircleColors.progressFill,
-                  borderRadius: BorderRadius.circular(4),
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(6),
                 ),
               ),
             ),
@@ -738,7 +755,7 @@ class _EmptyFamily extends StatelessWidget {
             height: 44,
             alignment: Alignment.center,
             decoration: const BoxDecoration(
-              color: CircleColors.mapBackground,
+              color: AppColors.primarySoft,
               shape: BoxShape.circle,
             ),
             child: const CircleSvg('icon_users', size: 16),
@@ -795,7 +812,7 @@ class _MemberRow extends StatelessWidget {
       color: CircleColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: CircleColors.border),
+        side: const BorderSide(color: AppColors.primarySoft, width: 1.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
