@@ -5,6 +5,7 @@ import '../app_services.dart';
 import '../data/account_session.dart';
 import '../data/family_store.dart';
 import '../data/mock_circle.dart';
+import '../data/mock_notifications.dart';
 import '../models/daily_goals.dart';
 import '../theme/app_colors.dart';
 import '../theme/circle_colors.dart';
@@ -14,6 +15,7 @@ import 'friends_stats_screen.dart';
 import 'leaderboard_screen.dart';
 import 'member_detail_screen.dart';
 import 'my_stats_screen.dart';
+import 'notifications_screen.dart';
 import 'nudge_screen.dart';
 import 'privacy_screen.dart';
 
@@ -62,6 +64,25 @@ class _CircleScreenState extends State<CircleScreen> {
 
   /// The one the Circle home is showing.
   late CircleFamily _family = _store.families.first;
+
+  /// Notifications you haven't seen yet (drives the dot on the bell).
+  final Set<String> _unread = {
+    for (final n in mockNotifications)
+      if (n.unread) n.id,
+  };
+
+  Future<void> _openNotifications() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NotificationsScreen(
+          unreadIds: {..._unread},
+          onNudgeBack: _nudge,
+        ),
+      ),
+    );
+    // Seen them all now.
+    if (mounted) setState(_unread.clear);
+  }
 
   Future<void> _switchFamily() async {
     final next = await showFamilySwitcher(
@@ -167,6 +188,8 @@ class _CircleScreenState extends State<CircleScreen> {
               onNudge: _nudge,
               onOpenMyStats: _openMyStats,
               onOpenFriendsStats: _openFriendsStats,
+              hasUnread: _unread.isNotEmpty,
+              onOpenNotifications: _openNotifications,
             ),
             NudgeScreen(key: _nudgeKey, initialRecipient: _nudgeRecipient),
             PrivacyScreen(
@@ -189,9 +212,13 @@ class _CircleHome extends StatelessWidget {
     required this.onNudge,
     required this.onOpenMyStats,
     required this.onOpenFriendsStats,
+    required this.hasUnread,
+    required this.onOpenNotifications,
   });
 
   final CircleFamily family;
+  final bool hasUnread;
+  final VoidCallback onOpenNotifications;
   final VoidCallback onSwitchFamily;
   final VoidCallback onOpenMyStats;
   final VoidCallback onOpenFriendsStats;
@@ -205,7 +232,12 @@ class _CircleHome extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Header(familyName: family.name, onTap: onSwitchFamily),
+          _Header(
+            familyName: family.name,
+            onTap: onSwitchFamily,
+            hasUnread: hasUnread,
+            onOpenNotifications: onOpenNotifications,
+          ),
           const SizedBox(height: 14),
           _PulseMap(members: family.mapMembers),
           const SizedBox(height: 14),
@@ -303,12 +335,21 @@ class _CircleLink extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.familyName, required this.onTap});
+  const _Header({
+    required this.familyName,
+    required this.onTap,
+    required this.hasUnread,
+    required this.onOpenNotifications,
+  });
 
   final String familyName;
 
   /// Opens the family switcher.
   final VoidCallback onTap;
+
+  /// Shows the dot on the bell.
+  final bool hasUnread;
+  final VoidCallback onOpenNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -367,26 +408,41 @@ class _Header extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        SizedBox(
-          width: 44,
-          height: 44,
-          child: Stack(
-            children: [
-              SvgPicture.asset(
-                '$circleAssets/notifications.svg',
+        Tooltip(
+          message: 'Notifications',
+          child: Semantics(
+            button: true,
+            label: hasUnread ? 'Notifications, new' : 'Notifications',
+            excludeSemantics: true,
+            child: InkResponse(
+              key: const ValueKey('notifications-button'),
+              onTap: onOpenNotifications,
+              radius: 26,
+              child: SizedBox(
                 width: 44,
                 height: 44,
-              ),
-              Positioned(
-                left: 25,
-                top: 9,
-                child: SvgPicture.asset(
-                  '$circleAssets/notification_dot.svg',
-                  width: 10,
-                  height: 10,
+                child: Stack(
+                  children: [
+                    SvgPicture.asset(
+                      '$circleAssets/notifications.svg',
+                      width: 44,
+                      height: 44,
+                    ),
+                    if (hasUnread)
+                      Positioned(
+                        left: 25,
+                        top: 9,
+                        child: SvgPicture.asset(
+                          '$circleAssets/notification_dot.svg',
+                          key: const ValueKey('notification-dot'),
+                          width: 10,
+                          height: 10,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ],
