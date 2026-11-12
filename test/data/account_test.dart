@@ -273,4 +273,109 @@ void main() {
       );
     });
   });
+
+  group('AccountSession when the profile cannot load', () {
+    late MockAuthRepository auth;
+    late _FlakyProfiles profiles;
+    late AccountSession session;
+
+    setUp(() {
+      auth = MockAuthRepository();
+      profiles = _FlakyProfiles();
+      session = AccountSession(auth: auth, profiles: profiles);
+    });
+
+    tearDown(() {
+      session.dispose();
+      auth.dispose();
+    });
+
+    Future<void> onboard() async {
+      await auth.signUpWithEmail('nhi@example.com', 'password1');
+      await settle();
+      await session.completeOnboarding(
+        displayName: 'Nhi',
+        username: 'nhi',
+        avatarEmoji: '🦊',
+        goals: const DailyGoals(steps: 12000),
+      );
+      await session.signOut();
+      await settle();
+    }
+
+    test('a failed load ends in loadFailed, not loading forever', () async {
+      await onboard();
+      profiles.failing = true;
+
+      await auth.signInWithEmail('nhi@example.com', 'password1');
+      await settle();
+
+      expect(session.status, AccountStatus.loadFailed);
+      expect(session.profile, isNull);
+      expect(session.user, isNotNull);
+    });
+
+    test('retry stays failed while offline, then loads the profile', () async {
+      await onboard();
+      profiles.failing = true;
+      await auth.signInWithEmail('nhi@example.com', 'password1');
+      await settle();
+
+      final seen = <AccountStatus>[];
+      session.addListener(() => seen.add(session.status));
+
+      await session.retry();
+      expect(session.status, AccountStatus.loadFailed);
+      expect(seen, [AccountStatus.loading, AccountStatus.loadFailed]);
+
+      profiles.failing = false;
+      await session.retry();
+      expect(session.status, AccountStatus.ready);
+      expect(session.profile!.username, 'nhi');
+      expect(session.goals.steps, 12000);
+    });
+
+    test('a failed goals load also ends in loadFailed', () async {
+      await onboard();
+      profiles.failGoals = true;
+
+      await auth.signInWithEmail('nhi@example.com', 'password1');
+      await settle();
+
+      expect(session.status, AccountStatus.loadFailed);
+    });
+
+    test('logging out from loadFailed signs out', () async {
+      await onboard();
+      profiles.failing = true;
+      await auth.signInWithEmail('nhi@example.com', 'password1');
+      await settle();
+
+      await session.signOut();
+      await settle();
+      expect(session.status, AccountStatus.signedOut);
+    });
+
+    test('retry does nothing unless the load failed', () async {
+      await settle();
+      expect(session.status, AccountStatus.signedOut);
+      await session.retry();
+      expect(session.status, AccountStatus.signedOut);
+    });
+  });
+}
+
+/// Fails like an offline or refused Firestore read while [failing] (profile)
+/// or [failGoals] (goals) is set.
+class _FlakyProfiles extends MockProfileRepository {
+  var failing = false;
+  var failGoals = false;
+
+  @override
+  Future<UserProfile?> profileFor(String uid) =>
+      failing ? Future.error(Exception('unavailable')) : super.profileFor(uid);
+
+  @override
+  Future<DailyGoals> goalsFor(String uid) =>
+      failGoals ? Future.error(Exception('unavailable')) : super.goalsFor(uid);
 }

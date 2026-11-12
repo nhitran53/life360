@@ -17,6 +17,10 @@ enum AccountStatus {
   /// Signed in, but hasn't picked a username yet.
   needsProfile,
   ready,
+
+  /// Signed in, but the profile couldn't be loaded (offline, server error).
+  /// [AccountSession.retry] tries again.
+  loadFailed,
 }
 
 /// Who's signed in and their profile. The app listens to this to decide
@@ -89,14 +93,37 @@ class AccountSession extends ChangeNotifier {
       _set(AccountStatus.signedOut);
       return;
     }
-    final profile = await profiles.profileFor(user.uid);
-    final goals = await profiles.goalsFor(user.uid);
+    final UserProfile? profile;
+    final DailyGoals goals;
+    try {
+      profile = await profiles.profileFor(user.uid);
+      goals = await profiles.goalsFor(user.uid);
+    } on Exception catch (e) {
+      if (generation != _generation || _disposed) return;
+      // Only the kind of failure: the details could identify the user.
+      debugPrint('Loading the profile failed: ${e.runtimeType}');
+      _profile = null;
+      _friends = null;
+      _sharing = null;
+      _goals = const DailyGoals();
+      _set(AccountStatus.loadFailed);
+      return;
+    }
     if (generation != _generation || _disposed) return;
     _profile = profile;
     _friends = profile == null ? null : friendsFor?.call(profile);
     _sharing = profile == null ? null : sharingFor?.call(profile);
     _goals = goals;
     _set(profile == null ? AccountStatus.needsProfile : AccountStatus.ready);
+  }
+
+  /// Loads the signed-in user's profile again after
+  /// [AccountStatus.loadFailed]. Shows [AccountStatus.loading] meanwhile.
+  /// Does nothing in any other state.
+  Future<void> retry() async {
+    if (_status != AccountStatus.loadFailed) return;
+    _set(AccountStatus.loading);
+    await _onAuthChanged(_user);
   }
 
   void _set(AccountStatus status) {
