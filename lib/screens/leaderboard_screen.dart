@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data/family_store.dart';
 import '../data/friends_repository.dart';
+import '../data/league_service.dart';
 import '../data/mock_circle.dart';
 import '../data/mock_friends_repository.dart';
 import '../data/mock_stats_repository.dart';
@@ -15,6 +16,7 @@ import '../theme/app_theme.dart';
 import '../theme/stat_colors.dart';
 import '../utils/format.dart';
 import '../widgets/chunky.dart';
+import '../widgets/league_card.dart';
 import 'my_stats_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -130,6 +132,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   /// Keyed by [_key] so each family + board is only loaded once.
   final _cache = <String, Future<_BoardData>>{};
+
+  /// Your league, between all your friends. Loaded the first time the
+  /// Overall XP board is shown for all friends.
+  late final Future<LeagueStanding> _league = LeagueService(
+    stats: _stats,
+    friends: _friends,
+    clock: _clock,
+  ).standing();
 
   String get _key => '${_family?.id ?? 'friends'}/${_board.name}';
 
@@ -255,6 +265,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       key: ValueKey(_key),
                       board: _board,
                       data: snapshot.data!,
+                      // Leagues are between all your friends, so they only
+                      // show on the friends-wide XP board.
+                      leagueCard: _board == LeaderboardBoard.xp &&
+                              family == null
+                          ? _LeagueSlot(standing: _league)
+                          : null,
                       // Only for a family with nobody else in it yet. A
                       // board can also be short because people keep a
                       // stat private; _BoardView explains that instead.
@@ -537,10 +553,14 @@ class _BoardView extends StatelessWidget {
     required this.board,
     required this.data,
     this.soloText,
+    this.leagueCard,
   });
 
   final LeaderboardBoard board;
   final _BoardData data;
+
+  /// Shown above the podium (Overall XP, all friends).
+  final Widget? leagueCard;
 
   /// Shown instead of a one-person podium (e.g. a brand-new family).
   final String? soloText;
@@ -578,10 +598,12 @@ class _BoardView extends StatelessWidget {
     final top = entries.take(3).toList();
     final rest = entries.skip(3).toList();
     final text = Theme.of(context).textTheme;
+    final leagueCard = this.leagueCard;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
+        if (leagueCard != null) ...[leagueCard, const SizedBox(height: 16)],
         Text(board.caption, style: text.bodySmall),
         const SizedBox(height: 16),
         _Podium(board: board, top: top, data: data),
@@ -595,6 +617,23 @@ class _BoardView extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The league card once [standing] loads. Nothing while loading or if it
+/// fails: the leaderboard itself is what matters on this screen.
+class _LeagueSlot extends StatelessWidget {
+  const _LeagueSlot({required this.standing});
+
+  final Future<LeagueStanding> standing;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<LeagueStanding>(
+    future: standing,
+    builder: (context, snapshot) {
+      final data = snapshot.data;
+      return data == null ? const SizedBox.shrink() : LeagueCard(standing: data);
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -996,16 +1035,6 @@ String weekResetLabel(DateTime now) {
     return 'Resets in $h ${h == 1 ? 'hour' : 'hours'}';
   }
   return 'Resets in ${math.max(1, left.inMinutes)} min';
-}
-
-String ordinal(int n) {
-  if (n % 100 >= 11 && n % 100 <= 13) return '${n}th';
-  return switch (n % 10) {
-    1 => '${n}st',
-    2 => '${n}nd',
-    3 => '${n}rd',
-    _ => '${n}th',
-  };
 }
 
 String movementPhrase(int? delta) {

@@ -31,7 +31,7 @@ void main() {
     // A tall phone so the whole board (family picker, podium and every row)
     // is on screen. Rows below the fold aren't built, so tests that check
     // every row would miss them on a shorter screen.
-    tester.view.physicalSize = const Size(1170, 3000);
+    tester.view.physicalSize = const Size(1170, 3600);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(
@@ -76,6 +76,16 @@ void main() {
           expect(find.byKey(ValueKey('row-${e.user.id}')), findsOneWidget);
         }
       });
+
+  testWidgets('Overall XP shows your league; other boards do not',
+      (tester) async {
+    await pumpBoard(tester);
+    expect(find.byKey(const ValueKey('league-card')), findsOneWidget);
+    expect(find.textContaining('League'), findsWidgets);
+
+    await selectBoard(tester, LeaderboardBoard.steps);
+    expect(find.byKey(const ValueKey('league-card')), findsNothing);
+  });
 
   testWidgets('switching to Steps re-ranks and shows step totals',
           (tester) async {
@@ -140,6 +150,8 @@ void main() {
           }
           // Friends who aren't family are gone.
           expect(find.byKey(const ValueKey('row-u_alex')), findsNothing);
+          // Leagues are between all your friends, not one family.
+          expect(find.byKey(const ValueKey('league-card')), findsNothing);
           expect(find.text('Alex'), findsNothing);
 
           // And back again.
