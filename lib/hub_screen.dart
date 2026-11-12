@@ -38,6 +38,7 @@ Widget _myStats(AppServices s) =>
       friends: s.friends,
       stats: s.stats,
       screenTimeLog: s.screenTime,
+      deviceScreenTime: s.deviceScreenTime,
     );
 
 Widget _friendsStats(AppServices s) => FriendsStatsScreen(

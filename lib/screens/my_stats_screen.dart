@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../data/connectable_stats_repository.dart';
+import '../data/device_screen_time.dart';
 import '../data/friends_repository.dart';
 import '../data/health/health_source.dart';
 import '../data/mock_friends_repository.dart';
@@ -31,6 +32,7 @@ class MyStatsScreen extends StatefulWidget {
     this.clock,
     this.goals = const DailyGoals(),
     this.screenTimeLog,
+    this.deviceScreenTime = const NoDeviceScreenTime(),
   });
 
   /// Defaults to mock repositories until the backend exists. When [stats] is a
@@ -46,6 +48,11 @@ class MyStatsScreen extends StatefulWidget {
   /// `ManualScreenTimeRepository`), or the logged value won't show.
   final ScreenTimeLog? screenTimeLog;
 
+  /// Screen time the phone measures. When it's supported but access is off,
+  /// Today offers to turn it on. [stats] should read from the same source
+  /// (see `ManualScreenTimeRepository`).
+  final DeviceScreenTime deviceScreenTime;
+
   @override
   State<MyStatsScreen> createState() => _MyStatsScreenState();
 }
@@ -57,7 +64,12 @@ class _MyStatsData {
     required this.streak,
     required this.weekXp,
     required this.badges,
+    required this.screenTimeAccess,
   });
+
+  /// Whether the phone's screen time can be read; null where the phone
+  /// can't measure it at all.
+  final bool? screenTimeAccess;
 
   /// Null when nothing has synced today.
   final DailyStats? today;
@@ -69,7 +81,8 @@ class _MyStatsData {
   final List<RewardBadge> badges;
 }
 
-class _MyStatsScreenState extends State<MyStatsScreen> {
+class _MyStatsScreenState extends State<MyStatsScreen>
+    with WidgetsBindingObserver {
   late final DateTime Function() _clock = widget.clock ?? DateTime.now;
   late final FriendsRepository _friends =
       widget.friends ?? MockFriendsRepository(clock: _clock);
@@ -80,6 +93,28 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
   var _syncing = false;
   var _syncFailed = false;
   late Future<_MyStatsData> _data = _restoreAndLoad();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Coming back from Settings may have turned usage access on.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (!widget.deviceScreenTime.isSupported) return;
+    setState(() {
+      _data = _load();
+    });
+  }
 
   /// The stats source when it can connect to a health platform.
   ConnectableStatsRepository? get _connectable {
@@ -99,6 +134,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
     final goals = widget.goals;
     final friends = _friends;
     final stats = _stats;
+    final device = widget.deviceScreenTime;
     final now = _clock();
     final today = dateOnly(now);
     final me = await friends.currentUser();
@@ -119,6 +155,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
       streak: streakWithFreezes(recent, today: today, goals: goals),
       weekXp: weeklyXp(week),
       badges: earnedBadges(recent, goals: goals),
+      screenTimeAccess: device.isSupported ? await device.hasAccess() : null,
     );
   }
 
@@ -229,6 +266,9 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                       today: data.today,
                       goals: widget.goals,
                       denied: denied,
+                      onAllowScreenTime: data.screenTimeAccess == false
+                          ? widget.deviceScreenTime.openAccessSettings
+                          : null,
                       onLogScreenTime: log == null
                           ? null
                           : () => _logScreenTime(
@@ -464,6 +504,7 @@ class _TodayView extends StatelessWidget {
     required this.goals,
     required this.denied,
     this.onLogScreenTime,
+    this.onAllowScreenTime,
   });
 
   final DailyStats? today;
@@ -475,10 +516,14 @@ class _TodayView extends StatelessWidget {
   /// Null hides the button to log screen time by hand.
   final VoidCallback? onLogScreenTime;
 
+  /// Null hides the button to let the phone track screen time.
+  final VoidCallback? onAllowScreenTime;
+
   @override
   Widget build(BuildContext context) {
     final today = this.today;
     final onLog = onLogScreenTime;
+    final onAllow = onAllowScreenTime;
     if (today == null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -486,6 +531,10 @@ class _TodayView extends StatelessWidget {
           const _Message(
             text: 'Nothing synced yet today. Go for a walk and check back! 👟',
           ),
+          if (onAllow != null) ...[
+            _AllowScreenTimeButton(onTap: onAllow),
+            const SizedBox(height: 8),
+          ],
           if (onLog != null) _LogScreenTimeButton(logged: false, onTap: onLog),
         ],
       );
@@ -506,6 +555,10 @@ class _TodayView extends StatelessWidget {
             goals: goals,
             denied: denied.contains(metric),
           ),
+          if (metric == StatMetric.screenTime && onAllow != null) ...[
+            const SizedBox(height: 8),
+            _AllowScreenTimeButton(onTap: onAllow),
+          ],
           if (metric == StatMetric.screenTime && onLog != null) ...[
             const SizedBox(height: 8),
             _LogScreenTimeButton(
@@ -518,6 +571,23 @@ class _TodayView extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Opens Android's usage access settings so the phone can track screen time.
+class _AllowScreenTimeButton extends StatelessWidget {
+  const _AllowScreenTimeButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ChunkyButton(
+    key: const ValueKey('screen-time-access'),
+    label: 'Track screen time automatically',
+    icon: Icons.phone_android_rounded,
+    color: StatMetric.screenTime.color,
+    edgeColor: StatMetric.screenTime.edgeColor,
+    onPressed: onTap,
+  );
 }
 
 class _LogScreenTimeButton extends StatelessWidget {
