@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_services.dart';
 import '../data/account_session.dart';
 import '../theme/app_colors.dart';
+import '../widgets/chunky.dart';
 import 'circle_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -85,9 +86,67 @@ class _AuthGateState extends State<AuthGate> {
       ),
       AccountStatus.signedOut => widget.welcome,
       AccountStatus.needsProfile => const OnboardingScreen(),
+      AccountStatus.loadFailed => _LoadFailedScreen(session: session),
       AccountStatus.ready =>
         widget.signedIn?.call(context) ??
             CircleScreen(services: _servicesOf(session)),
     };
+  }
+}
+
+/// Signed in, but the profile couldn't be loaded (usually offline). Lets the
+/// user try again or log out instead of waiting on a spinner forever.
+class _LoadFailedScreen extends StatelessWidget {
+  const _LoadFailedScreen({required this.session});
+
+  final AccountSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(
+                  Icons.wifi_off_rounded,
+                  size: 56,
+                  color: AppColors.inkSoft,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Couldn't load your profile",
+                  textAlign: TextAlign.center,
+                  style: text.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Check your connection and try again.',
+                  textAlign: TextAlign.center,
+                  style: text.bodyLarge?.copyWith(color: AppColors.inkSoft),
+                ),
+                const SizedBox(height: 32),
+                ChunkyButton(
+                  key: const ValueKey('retry-profile'),
+                  label: 'Try again',
+                  icon: Icons.refresh_rounded,
+                  onPressed: session.retry,
+                ),
+                const SizedBox(height: 12),
+                ChunkyButton.secondary(
+                  label: 'Log out',
+                  onPressed: session.signOut,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

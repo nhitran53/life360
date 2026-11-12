@@ -22,6 +22,15 @@ class _FailingProfiles extends MockProfileRepository {
   }) => Future.error(Exception('permission-denied'));
 }
 
+/// Profile reads fail like an offline Firestore would, while [failing].
+class _OfflineProfiles extends MockProfileRepository {
+  var failing = true;
+
+  @override
+  Future<UserProfile?> profileFor(String uid) =>
+      failing ? Future.error(Exception('unavailable')) : super.profileFor(uid);
+}
+
 void main() {
   late MockAuthRepository auth;
   late MockProfileRepository profiles;
@@ -234,6 +243,56 @@ void main() {
 
     expect(find.byKey(const ValueKey('auth-error')), findsNothing);
     expect(session.user, isNull);
+  });
+
+  /// Like [makeSession], with profile reads that fail until [failing] is
+  /// switched off.
+  _OfflineProfiles makeOfflineSession() {
+    auth = MockAuthRepository();
+    final offline = _OfflineProfiles();
+    profiles = offline;
+    session = AccountSession(auth: auth, profiles: profiles);
+    addTearDown(() {
+      session.dispose();
+      auth.dispose();
+    });
+    return offline;
+  }
+
+  testWidgets('A failed profile load offers Try again instead of spinning', (
+    tester,
+  ) async {
+    final offline = makeOfflineSession();
+    await startApp(tester);
+    await signUp(tester);
+
+    expect(find.text("Couldn't load your profile"), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    // Still offline: stays on the message.
+    await tester.tap(find.byKey(const ValueKey('retry-profile')));
+    await tester.pumpAndSettle();
+    expect(find.text("Couldn't load your profile"), findsOneWidget);
+
+    // Back online: carries on to onboarding (no profile yet).
+    offline.failing = false;
+    await tester.tap(find.byKey(const ValueKey('retry-profile')));
+    await tester.pumpAndSettle();
+    expect(find.byType(OnboardingScreen), findsOneWidget);
+  });
+
+  testWidgets('Logging out from a failed profile load goes back to welcome', (
+    tester,
+  ) async {
+    makeOfflineSession();
+    await startApp(tester);
+    await signUp(tester);
+    expect(find.text("Couldn't load your profile"), findsOneWidget);
+
+    await tester.tap(find.text('Log out'));
+    await tester.pumpAndSettle();
+    expect(find.text("Let's go"), findsOneWidget);
+    expect(session.status, AccountStatus.signedOut);
   });
 
   testWidgets('Account page logs out back to the welcome screen', (
