@@ -168,7 +168,7 @@ class _MyStatsScreenState extends State<MyStatsScreen>
     var failed = false;
     try {
       await stats.connect();
-    } catch (_) {
+    } on Exception {
       // Never surface or log the error text: it could carry health details.
       failed = true;
     }
@@ -193,7 +193,7 @@ class _MyStatsScreenState extends State<MyStatsScreen>
     final messenger = ScaffoldMessenger.of(context);
     try {
       await log.setMinutes(day, minutes);
-    } catch (_) {
+    } on Exception {
       // Never surface the error text: it could carry health details.
       messenger.showSnackBar(
         const SnackBar(content: Text("Couldn't save that. Try again.")),
@@ -428,7 +428,7 @@ class _FreezeLine extends StatelessWidget {
     return Row(
       key: const ValueKey('freeze-line'),
       children: [
-        Icon(Icons.ac_unit_rounded, size: 18, color: AppColors.blue),
+        const Icon(Icons.ac_unit_rounded, size: 18, color: AppColors.blue),
         const SizedBox(width: 6),
         Expanded(
           child: Text(

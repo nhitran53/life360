@@ -34,6 +34,8 @@ class AuthUser {
 
 /// Lowercase letters, digits, "_" and ".", starting with a letter.
 final _usernamePattern = RegExp(r'^[a-z][a-z0-9_.]*$');
+final _startsWithLetter = RegExp('^[a-z]');
+final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
 const usernameMinLength = 3;
 const usernameMaxLength = 20;
@@ -54,7 +56,7 @@ String? usernameProblem(String username) {
   if (username.length > usernameMaxLength) {
     return 'At most $usernameMaxLength characters';
   }
-  if (!RegExp('^[a-z]').hasMatch(username)) return 'Start with a letter';
+  if (!_startsWithLetter.hasMatch(username)) return 'Start with a letter';
   if (!_usernamePattern.hasMatch(username)) {
     return 'Only letters, numbers, _ and .';
   }
@@ -75,7 +77,7 @@ String? displayNameProblem(String displayName) {
 /// Very loose check: something@something.something. The auth backend does
 /// the real validation.
 bool looksLikeEmail(String email) =>
-    RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.trim());
+    _emailPattern.hasMatch(email.trim());
 
 const passwordMinLength = 8;
 

@@ -11,6 +11,9 @@ String inviteLink(String friendCode) => '$inviteLinkBase$friendCode';
 
 final _codePattern = RegExp(r'^[A-Z0-9]{4,10}$');
 
+/// Where the code ends in an invite link's path.
+final _pathEnd = RegExp(r'[/?#]');
+
 /// The friend code in [input], or null if it doesn't look like one.
 ///
 /// Accepts a bare code in any case ("gia999") or an invite link
@@ -19,7 +22,7 @@ String? friendCodeFrom(String input) {
   var text = input.trim();
   final add = text.lastIndexOf('/add/');
   if (add != -1) {
-    text = text.substring(add + '/add/'.length).split(RegExp(r'[/?#]')).first;
+    text = text.substring(add + '/add/'.length).split(_pathEnd).first;
   }
   final code = text.toUpperCase();
   return _codePattern.hasMatch(code) ? code : null;

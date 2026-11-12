@@ -41,6 +41,9 @@ linter:
     cancel_subscriptions: true
     prefer_final_locals: true
     unawaited_futures: true
+    always_declare_return_types: true
+    avoid_catches_without_on_clauses: true
+    prefer_const_constructors: true
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

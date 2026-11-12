@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'app_errors.dart';
 import 'data/account_session.dart';
 import 'data/firebase_auth_repository.dart';
 import 'data/firestore_friends_repository.dart';
@@ -24,6 +25,7 @@ import 'widgets/chunky.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installErrorHandlers();
   runApp(Friend360App(session: await _firebaseSession()));
 }
 

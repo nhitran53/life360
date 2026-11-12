@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/models.dart';
 import 'connectable_stats_repository.dart';
 import 'friends_repository.dart';
@@ -110,7 +112,9 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     try {
       if (_connected || !await _store.loadConnected()) return;
       await _sync(_source.checkPermissions);
-    } catch (_) {
+    } on Object {
+      // Restoring at launch must never crash the app, whatever the plugin
+      // or store throws.
       // Never surface the error text: it could carry health details.
     }
   }
@@ -128,7 +132,11 @@ class HealthStatsRepository implements ConnectableStatsRepository {
   Future<void> _remember(bool connected) async {
     try {
       await _store.saveConnected(connected);
-    } catch (_) {}
+    } on Object catch (e) {
+      // Best effort, whatever the store throws: the user just reconnects
+      // next launch. Log the type only, no details.
+      debugPrint('Saving the health connection failed: ${e.runtimeType}');
+    }
   }
 
   /// Sends the user to the store to install or update the health app.

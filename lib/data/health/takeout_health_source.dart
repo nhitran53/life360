@@ -62,7 +62,7 @@ class TakeoutHealthSource implements HealthSource {
     final String raw;
     try {
       raw = await _load();
-    } on Object {
+    } on Exception {
       // Drop the original error: it could carry a path.
       throw const TakeoutLoadException();
     }
@@ -76,27 +76,50 @@ class TakeoutHealthSource implements HealthSource {
     if (rows is! List) return [];
     final days = <DailyStats>[];
     for (final row in rows) {
-      try {
-        final r = Map<String, dynamic>.from(row as Map);
-        const metricKeys = [
-          'steps',
-          'sleepMinutes',
-          'workoutMinutes',
-          'activeCalories',
-        ];
-        if (metricKeys.any((k) => ((r[k] as int?) ?? 0) < 0)) continue;
-        final s = DailyStats.fromJson({...r, 'userId': userId});
-        if (s.date.isBefore(start) || s.date.isAfter(end)) continue;
-        if (s.steps + s.sleepMinutes + s.workoutMinutes + s.activeCalories >
-            0) {
-          days.add(s);
-        }
-      } on FormatException {
-        continue; // skip malformed rows
-      } on TypeError {
-        continue;
+      final s = _parseRow(row, userId);
+      if (s == null || s.date.isBefore(start) || s.date.isAfter(end)) continue;
+      if (s.steps + s.sleepMinutes + s.workoutMinutes + s.activeCalories > 0) {
+        days.add(s);
       }
     }
     return days..sort((a, b) => a.date.compareTo(b.date));
+  }
+
+  /// One day from an export row, or null for a malformed row: a missing or
+  /// unparseable date, a metric that isn't a whole number, or a negative
+  /// health metric.
+  static DailyStats? _parseRow(Object? row, String userId) {
+    if (row is! Map) return null;
+    final date = switch (row['date']) {
+      final String d => DateTime.tryParse(d),
+      _ => null,
+    };
+    if (date == null) return null;
+    int? count(String key, {bool allowNegative = false}) => switch (row[key]) {
+      null => 0,
+      final int v when allowNegative || v >= 0 => v,
+      _ => null,
+    };
+    final steps = count('steps');
+    final sleep = count('sleepMinutes');
+    final workout = count('workoutMinutes');
+    final calories = count('activeCalories');
+    final screenTime = count('screenTimeMinutes', allowNegative: true);
+    if (steps == null ||
+        sleep == null ||
+        workout == null ||
+        calories == null ||
+        screenTime == null) {
+      return null;
+    }
+    return DailyStats(
+      userId: userId,
+      date: date,
+      steps: steps,
+      sleepMinutes: sleep,
+      workoutMinutes: workout,
+      activeCalories: calories,
+      screenTimeMinutes: screenTime,
+    );
   }
 }
