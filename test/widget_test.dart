@@ -10,7 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:life360/data/device_screen_time.dart';
 import 'package:life360/data/family_store.dart';
-import 'package:life360/hub_screen.dart';
+import 'package:life360/screens/hub_screen.dart';
 import 'package:life360/screens/friends_stats_screen.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';

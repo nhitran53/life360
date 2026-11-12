@@ -27,6 +27,7 @@ import 'data/sharing_repository.dart';
 import 'data/sharing_stats_repository.dart';
 import 'data/stats_repository.dart';
 import 'data/stats_sync.dart';
+import 'utils/platform_support.dart';
 
 /// The app's repositories, created once and passed down to screens.
 class AppServices {
@@ -73,10 +74,7 @@ class AppServices {
   }) {
     friends ??= MockFriendsRepository();
     final mockStats = MockStatsRepository(friends: friends);
-    final onPhone =
-        !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS);
+    final onPhone = isPhone;
     // Debug only: `--dart-define=TAKEOUT_JSON=/path/daily.json` serves real
     // daily totals from a Takeout export instead of the platform store.
     const takeoutPath = String.fromEnvironment('TAKEOUT_JSON');
@@ -115,8 +113,7 @@ class AppServices {
       stats: health,
       sharing: published ?? sharing,
       // Only Android lets apps read screen time (with usage access).
-      deviceScreenTime:
-          !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+      deviceScreenTime: canReadDeviceScreenTime
           ? AndroidUsageScreenTime()
           : const NoDeviceScreenTime(),
     );

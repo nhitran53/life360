@@ -169,7 +169,7 @@ void main() {
 
     test('pausing later deletes days that left the 14-day window', () async {
       await publishAll();
-      var later = now.add(const Duration(days: 20));
+      final later = now.add(const Duration(days: 20));
       source.connected = false;
       final laterSync = StatsSync(
         source: source,

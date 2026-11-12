@@ -83,7 +83,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _checkName() async {
     final username = normalizeUsername(_username.text);
     final nameError = displayNameProblem(_name.text);
-    var usernameError = usernameProblem(username);
+    final usernameError = usernameProblem(username);
     setState(() {
       _nameError = nameError;
       _usernameError = usernameError;
