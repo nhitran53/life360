@@ -49,6 +49,12 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // Lowercased like normalizeEmail() in lib/models/account.dart. Fails
+    // (so the rule denies) for accounts without an email.
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
     function validName(name) {
       return name is string && name.trim().size() > 0 && name.size() <= 30;
     }
@@ -156,6 +162,15 @@ service cloud.firestore {
         allow read, write: if isMe(uid);
       }
 
+      // The sign-in email (FirestoreProfileRepository.saveEmail). It has to
+      // be the email on the account, lowercased.
+      match /private/account {
+        allow read, delete: if isMe(uid);
+        allow create, update: if isMe(uid)
+          && request.resource.data.keys().hasOnly(['email'])
+          && request.resource.data.email == myEmail();
+      }
+
       // Same shape as SharingSettings.toJson() in lib/models/sharing_settings.dart.
       match /private/settings {
         allow read, delete: if isMe(uid);
@@ -240,6 +255,20 @@ service cloud.firestore {
         && request.resource.data.respondedAt == request.time;
 
       allow delete: if signedIn() && request.auth.uid in resource.data.users;
+    }
+
+    // {uid} so friends can find you by your exact email. One get at a time,
+    // never a list, so nobody can browse emails. Only the account that has
+    // the email can claim it.
+    match /emails/{email} {
+      allow get: if signedIn();
+
+      allow create, update: if signedIn()
+        && email == myEmail()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     match /friendCodes/{code} {

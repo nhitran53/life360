@@ -25,7 +25,16 @@ abstract interface class ProfileRepository {
 
   Future<void> updateGoals(String uid, DailyGoals goals);
 
-  /// Removes the profile and goals, and frees the username and friend code.
+  /// Saves the email [uid] signed in with, so friends can find them by it.
+  /// Safe to call again with the same email.
+  Future<void> saveEmail(String uid, String email);
+
+  /// The saved email for [uid], or null if none was saved yet. Only the
+  /// owner can read it.
+  Future<String?> emailFor(String uid);
+
+  /// Removes the profile, goals and saved email, and frees the username,
+  /// friend code and email lookup.
   Future<void> deleteProfile(String uid);
 }
 

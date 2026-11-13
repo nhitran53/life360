@@ -77,6 +77,24 @@ class MockFriendsRepository implements FriendsRepository {
     return null;
   }
 
+  /// Mock users have no emails.
+  @override
+  Future<UserProfile?> findByEmail(String email) async => null;
+
+  @override
+  Future<List<UserProfile>> suggestions({int limit = 8}) async {
+    final taken = {
+      _me,
+      for (final f in _friendships)
+        if (f.involves(_me) && f.status != FriendshipStatus.declined)
+          f.otherUserId(_me),
+    };
+    return mockAllUsers
+        .where((u) => !taken.contains(u.id))
+        .take(limit)
+        .toList();
+  }
+
   @override
   Future<UserProfile?> userById(String userId) async {
     for (final u in mockAllUsers) {

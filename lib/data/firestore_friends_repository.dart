@@ -107,6 +107,35 @@ class FirestoreFriendsRepository implements FriendsRepository {
   }
 
   @override
+  Future<UserProfile?> findByEmail(String email) async {
+    final wanted = normalizeEmail(email);
+    if (!looksLikeEmail(wanted)) return null;
+    final claim = await _db.collection('emails').doc(wanted).get();
+    final uid = claim.data()?['uid'];
+    return uid is String ? userById(uid) : null;
+  }
+
+  /// How many of the newest accounts [suggestions] looks through.
+  static const suggestionPool = 30;
+
+  @override
+  Future<List<UserProfile>> suggestions({int limit = 8}) async {
+    final taken = {
+      _me.id,
+      for (final f in await _mine()) f.otherUserId(_me.id),
+    };
+    final snap = await _users
+        .orderBy('createdAt', descending: true)
+        .limit(suggestionPool)
+        .get();
+    return snap.docs
+        .where((d) => !taken.contains(d.id))
+        .map(_profile)
+        .take(limit)
+        .toList();
+  }
+
+  @override
   Future<UserProfile?> userById(String userId) async {
     if (userId == _me.id) return _me;
     final snap = await _users.doc(userId).get();

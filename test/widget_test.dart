@@ -95,6 +95,20 @@ void main() {
         expect(find.text('Live · synced 1 min ago'), findsOneWidget);
       });
 
+  testWidgets('Invite people opens the invite sheet', (tester) async {
+    useTallPhone(tester);
+
+    await tester.pumpWidget(const MaterialApp(home: CircleScreen()));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('invite-people-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Invite people'), findsWidgets);
+    expect(find.byKey(const ValueKey('invite-input')), findsOneWidget);
+    expect(find.text('Suggested for you'), findsOneWidget);
+  });
+
   testWidgets('Circle home links to My Stats with the connect button',
           (WidgetTester tester) async {
         useTallPhone(tester);

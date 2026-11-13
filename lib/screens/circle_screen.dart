@@ -12,6 +12,7 @@ import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
 import '../widgets/family_switcher.dart';
 import 'friends_stats_screen.dart';
+import 'invite_people_sheet.dart';
 import 'leaderboard_screen.dart';
 import 'member_detail_screen.dart';
 import 'my_stats_screen.dart';
@@ -76,10 +77,8 @@ class _CircleScreenState extends State<CircleScreen> {
   Future<void> _openNotifications() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => NotificationsScreen(
-          unreadIds: {..._unread},
-          onNudgeBack: _nudge,
-        ),
+        builder: (_) =>
+            NotificationsScreen(unreadIds: {..._unread}, onNudgeBack: _nudge),
       ),
     );
     // Seen them all now.
@@ -147,6 +146,14 @@ class _CircleScreenState extends State<CircleScreen> {
     );
   }
 
+  void _invitePeople() {
+    showInvitePeopleSheet(
+      context,
+      friends: _services.friends,
+      familyName: _family.name,
+    );
+  }
+
   void _nudge(CircleMember member) {
     setState(() {
       _nudgeRecipient = member;
@@ -190,6 +197,7 @@ class _CircleScreenState extends State<CircleScreen> {
               onNudge: _nudge,
               onOpenMyStats: _openMyStats,
               onOpenFriendsStats: _openFriendsStats,
+              onInvite: _invitePeople,
               hasUnread: _unread.isNotEmpty,
               onOpenNotifications: _openNotifications,
             ),
@@ -214,6 +222,7 @@ class _CircleHome extends StatelessWidget {
     required this.onNudge,
     required this.onOpenMyStats,
     required this.onOpenFriendsStats,
+    required this.onInvite,
     required this.hasUnread,
     required this.onOpenNotifications,
   });
@@ -224,6 +233,7 @@ class _CircleHome extends StatelessWidget {
   final VoidCallback onSwitchFamily;
   final VoidCallback onOpenMyStats;
   final VoidCallback onOpenFriendsStats;
+  final VoidCallback onInvite;
   final ValueChanged<CircleMember> onOpenMember;
   final ValueChanged<CircleMember> onNudge;
 
@@ -256,9 +266,16 @@ class _CircleHome extends StatelessWidget {
             label: "Friends' stats",
             onTap: onOpenFriendsStats,
           ),
+          const SizedBox(height: 8),
+          _CircleLink(
+            key: const ValueKey('invite-people-button'),
+            icon: Icons.person_add_alt_1_rounded,
+            label: 'Invite people',
+            onTap: onInvite,
+          ),
           if (family.listMembers.isEmpty) ...[
             const SizedBox(height: 14),
-            _EmptyFamily(name: family.name),
+            _EmptyFamily(name: family.name, onInvite: onInvite),
           ],
           for (final member in family.listMembers) ...[
             SizedBox(height: member == family.listMembers.first ? 14 : 8),
@@ -280,6 +297,7 @@ class _CircleHome extends StatelessWidget {
 
 class _CircleLink extends StatelessWidget {
   const _CircleLink({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -551,57 +569,69 @@ class _TogetherToday extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _EmptyFamily extends StatelessWidget {
-  const _EmptyFamily({required this.name});
+  const _EmptyFamily({required this.name, required this.onInvite});
 
   final String name;
+  final VoidCallback onInvite;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: CircleColors.surface,
+    return Material(
+      color: CircleColors.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primarySoft, width: _outline),
+        side: const BorderSide(color: AppColors.primarySoft, width: _outline),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.primarySoft,
-              shape: BoxShape.circle,
-            ),
-            child: const CircleSvg('icon_users', size: 16),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Just you so far',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: CircleColors.ink,
-                  ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const ValueKey('empty-family-invite'),
+        onTap: onInvite,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: AppColors.primarySoft,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Invite people to $name to start comparing stats',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: CircleColors.secondary,
-                  ),
+                child: const CircleSvg('icon_users', size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Just you so far',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: CircleColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Invite people to $name to start comparing stats',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: CircleColors.secondary,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const Icon(
+                Icons.person_add_alt_1_rounded,
+                color: AppColors.primaryText,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

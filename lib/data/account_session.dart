@@ -115,6 +115,21 @@ class AccountSession extends ChangeNotifier {
     _sharing = profile == null ? null : sharingFor?.call(profile);
     _goals = goals;
     _set(profile == null ? AccountStatus.needsProfile : AccountStatus.ready);
+    // Also fills in accounts made before emails were saved.
+    if (profile != null) unawaited(_saveEmail(user));
+  }
+
+  /// Saves the sign-in email with the profile so friends can find you by
+  /// it. A failure here shouldn't block the app, so it's only logged.
+  Future<void> _saveEmail(AuthUser user) async {
+    final email = user.email;
+    if (email == null) return;
+    try {
+      await profiles.saveEmail(user.uid, email);
+    } on Exception catch (e) {
+      // Only the kind of failure: the details could identify the user.
+      debugPrint('Saving the email failed: ${e.runtimeType}');
+    }
   }
 
   /// Loads the signed-in user's profile again after
@@ -152,6 +167,7 @@ class AccountSession extends ChangeNotifier {
     _sharing = sharingFor?.call(profile);
     _goals = goals;
     _set(AccountStatus.ready);
+    unawaited(_saveEmail(user));
   }
 
   Future<void> updateGoals(DailyGoals goals) async {

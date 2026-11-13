@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/data/firestore_friends_repository.dart';
@@ -168,5 +169,31 @@ void main() {
 
     expect((await db.collection('friendships').get()).docs, isEmpty);
     expect(await as(bob).friends(), isEmpty);
+  });
+
+  group('inviting', () {
+    test('findByEmail matches the exact email, any case', () async {
+      await FirestoreProfileRepository(db).saveEmail(bob.id, 'Bob@Example.com');
+
+      expect(await as(alice).findByEmail(' BOB@example.com '), bob);
+      expect(await as(alice).findByEmail('bob@example'), isNull);
+      expect(await as(alice).findByEmail('nobody@example.com'), isNull);
+    });
+
+    test('suggestions skip you, friends and pending requests', () async {
+      final dave = person('dave', 'Dave', 'dave', 'DDDDD2');
+      await db.doc('users/dave').set(dave.toJson()..remove('id'));
+      for (final (i, p) in [alice, bob, carol, dave].indexed) {
+        await db.doc('users/${p.id}').update({
+          'createdAt': Timestamp.fromMillisecondsSinceEpoch(1000 * (i + 1)),
+        });
+      }
+      expect(await as(alice).suggestions(), [dave, carol, bob]); // newest first
+
+      await as(alice).sendRequest(bob.id);
+      await as(carol).sendRequest(alice.id);
+      expect(await as(alice).suggestions(), [dave]);
+      expect(await as(alice).suggestions(limit: 0), isEmpty);
+    });
   });
 }

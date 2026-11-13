@@ -12,6 +12,7 @@ class MockProfileRepository implements ProfileRepository {
   final Random? _random;
   final _profiles = <String, UserProfile>{};
   final _goals = <String, DailyGoals>{};
+  final _emails = <String, String>{};
 
   Iterable<UserProfile> get _everyone => [...mockAllUsers, ..._profiles.values];
 
@@ -63,8 +64,17 @@ class MockProfileRepository implements ProfileRepository {
   }
 
   @override
+  Future<void> saveEmail(String uid, String email) async {
+    _emails[uid] = normalizeEmail(email);
+  }
+
+  @override
+  Future<String?> emailFor(String uid) async => _emails[uid];
+
+  @override
   Future<void> deleteProfile(String uid) async {
     _profiles.remove(uid);
     _goals.remove(uid);
+    _emails.remove(uid);
   }
 }

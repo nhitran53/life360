@@ -267,3 +267,50 @@ describe('friendships', () => {
     });
   });
 });
+
+describe('emails', () => {
+  const ALICE_EMAIL = 'alice@example.com';
+  /** Alice signed in with her (mixed-case) email on the token. */
+  const aliceWithEmail = () =>
+    env.authenticatedContext(ALICE, { email: 'Alice@Example.com' }).firestore();
+
+  /** Same writes as FirestoreProfileRepository.saveEmail. */
+  function saveEmail(firestore, uid, email) {
+    const batch = writeBatch(firestore);
+    batch.set(doc(firestore, `users/${uid}/private/account`), { email });
+    batch.set(doc(firestore, `emails/${email}`), { uid });
+    return batch.commit();
+  }
+
+  test('you can save your own lowercased email, and again later', async () => {
+    await assertSucceeds(saveEmail(aliceWithEmail(), ALICE, ALICE_EMAIL));
+    await assertSucceeds(saveEmail(aliceWithEmail(), ALICE, ALICE_EMAIL));
+  });
+
+  test("you can't claim an email that isn't on your account", async () => {
+    await assertFails(saveEmail(aliceWithEmail(), ALICE, 'bob@example.com'));
+    await assertFails(saveEmail(db(ALICE), ALICE, ALICE_EMAIL)); // no email
+    await assertFails(
+      setDoc(doc(aliceWithEmail(), `emails/${ALICE_EMAIL}`), { uid: BOB }),
+    );
+  });
+
+  test('anyone signed in can look up one exact email, but never list them', async () => {
+    await seed((f) => saveEmail(f, ALICE, ALICE_EMAIL));
+    await assertSucceeds(getDoc(doc(db(BOB), `emails/${ALICE_EMAIL}`)));
+    await assertFails(getDoc(doc(anon(), `emails/${ALICE_EMAIL}`)));
+    await assertFails(getDocs(collection(db(BOB), 'emails')));
+  });
+
+  test('only you can read your saved email', async () => {
+    await seed((f) => saveEmail(f, ALICE, ALICE_EMAIL));
+    await assertSucceeds(getDoc(doc(db(ALICE), `users/${ALICE}/private/account`)));
+    await assertFails(getDoc(doc(db(BOB), `users/${ALICE}/private/account`)));
+  });
+
+  test('only the owner can delete the lookup', async () => {
+    await seed((f) => saveEmail(f, ALICE, ALICE_EMAIL));
+    await assertFails(deleteDoc(doc(db(BOB), `emails/${ALICE_EMAIL}`)));
+    await assertSucceeds(deleteDoc(doc(db(ALICE), `emails/${ALICE_EMAIL}`)));
+  });
+});
