@@ -1,10 +1,10 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../data/account_session.dart';
 import '../data/auth_repository.dart';
 import '../models/models.dart';
 import '../theme/app_colors.dart';
+import '../utils/platform_support.dart';
 import '../widgets/chunky.dart';
 
 // ---------------------------------------------------------------------------
@@ -41,11 +41,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool get _signUp => _mode == SignInMode.signUp;
 
-  bool get _showApple =>
-      widget.showApple ??
-      (!kIsWeb &&
-          (defaultTargetPlatform == TargetPlatform.iOS ||
-              defaultTargetPlatform == TargetPlatform.macOS));
+  bool get _showApple => widget.showApple ?? offersAppleSignIn;
 
   @override
   void dispose() {

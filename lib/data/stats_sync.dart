@@ -117,7 +117,8 @@ class StatsSync {
         settings = sharing.settingsFor(userId);
         version = _settingsVersion;
         await publisher.revoke(settings);
-      } catch (_) {
+      } on Object {
+        // Background sync must survive any failure: retry later instead.
         _scheduleRetry();
         return;
       }
@@ -144,7 +145,7 @@ class StatsSync {
         sharing.settingsFor(userId),
         unavailable: source.deniedMetrics,
       );
-    } catch (_) {
+    } on Object {
       // Deliberately silent: see the class comment.
     }
   }
@@ -158,7 +159,7 @@ class StatsSync {
       try {
         // Re-reads the settings (or loads them, if the first load failed).
         await sharing.refresh();
-      } catch (_) {
+      } on Object {
         // The sync below schedules the next retry.
       }
       await sync();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:life360/data/device_screen_time.dart';
 import 'package:life360/data/health/fake_health_source.dart';
 import 'package:life360/data/health_stats_repository.dart';
 import 'package:life360/data/manual_screen_time_repository.dart';
@@ -46,6 +47,7 @@ void main() {
   Future<void> pumpScreen(
     WidgetTester tester, {
     ScreenTimeLog? screenTimeLog,
+    DeviceScreenTime? deviceScreenTime,
   }) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
@@ -58,6 +60,7 @@ void main() {
           stats: stats,
           clock: clock,
           screenTimeLog: screenTimeLog,
+          deviceScreenTime: deviceScreenTime ?? const NoDeviceScreenTime(),
         ),
       ),
     );
@@ -81,6 +84,69 @@ void main() {
     of: find.byKey(const ValueKey('today-screenTime')),
     matching: find.text(text),
   );
+
+  group('automatic screen time (Android usage access)', () {
+    late FakeDeviceScreenTime device;
+
+    Future<void> pumpWithDevice(WidgetTester tester) async {
+      stats = ManualScreenTimeRepository(
+        inner: health,
+        friends: friends,
+        log: log,
+        device: device,
+        clock: clock,
+      );
+      await pumpScreen(tester, screenTimeLog: log, deviceScreenTime: device);
+      await connect(tester);
+    }
+
+    setUp(() {
+      device = FakeDeviceScreenTime(minutes: {today: 75}, access: false);
+    });
+
+    testWidgets('offers to turn on usage access', (tester) async {
+      await pumpWithDevice(tester);
+
+      final button = find.byKey(const ValueKey('screen-time-access'));
+      expect(button, findsOneWidget);
+      await tapVisible(tester, button);
+      expect(device.settingsOpened, 1);
+    });
+
+    testWidgets('picks up screen time after access is granted', (
+      tester,
+    ) async {
+      await pumpWithDevice(tester);
+      expect(inScreenTimeCard('Not tracked yet today'), findsOneWidget);
+
+      // The user flips the switch in Settings and comes back.
+      device.access = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('screen-time-access')), findsNothing);
+      expect(
+        inScreenTimeCard(
+          goalStatus(StatMetric.screenTime, 75, const DailyGoals()),
+        ),
+        findsOneWidget,
+      );
+      // You can still correct it by hand.
+      expect(find.text('Edit screen time'), findsOneWidget);
+    });
+
+    testWidgets('no access button where the phone has no usage stats', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        screenTimeLog: log,
+        deviceScreenTime: const NoDeviceScreenTime(),
+      );
+      expect(find.byKey(const ValueKey('screen-time-access')), findsNothing);
+    });
+  });
 
   testWidgets('No log button without a screen time log', (tester) async {
     await pumpScreen(tester);

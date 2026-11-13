@@ -40,7 +40,7 @@ class SharingSettings {
         // A missing or malformed list keeps the private defaults, never
         // "share everything".
         hidden: switch (json['hidden']) {
-          final List names => {
+          final List<Object?> names => {
             for (final name in names)
               ...StatMetric.values.where((m) => m.name == name),
           },

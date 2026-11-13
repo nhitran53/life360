@@ -160,7 +160,8 @@ class FirestoreSharingRepository extends ChangeNotifier
       final saving = _save(settings);
       notifyListeners();
       await saving;
-    } catch (_) {
+    } on Object {
+      // Roll back on any failure; the error is rethrown below.
       if (_mine == settings) {
         _mine = previous;
         _loaded = wasLoaded;

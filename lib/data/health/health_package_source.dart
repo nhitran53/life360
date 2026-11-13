@@ -83,9 +83,10 @@ class HealthPackageSource implements HealthSource {
         types,
         permissions: List.filled(types.length, HealthDataAccess.READ),
       );
-    } catch (_) {
-      // The request can fail (e.g. the permission screen cannot open). The
-      // per-metric check below still reports what was actually granted.
+    } on Object {
+      // Any failure is fine here (the plugin isn't consistent about what it
+      // throws), e.g. the permission screen cannot open. The per-metric check
+      // below still reports what was actually granted.
     }
     return _currentPermissions();
   }

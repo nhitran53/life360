@@ -83,7 +83,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _checkName() async {
     final username = normalizeUsername(_username.text);
     final nameError = displayNameProblem(_name.text);
-    var usernameError = usernameProblem(username);
+    final usernameError = usernameProblem(username);
     setState(() {
       _nameError = nameError;
       _usernameError = usernameError;
@@ -123,7 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _usernameError = e.message;
         _step = _Step.name;
       });
-    } catch (e) {
+    } on Exception catch (e) {
       // Network or server trouble: say so instead of doing nothing.
       debugPrint('Saving the profile failed: ${e.runtimeType}');
       if (!mounted) return;

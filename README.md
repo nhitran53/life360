@@ -88,7 +88,6 @@ flutter test
 lib/
   main.dart          App entry and the animated home screen
   app_services.dart  Creates the repositories once and hands them to screens
-  hub_screen.dart    Menu of the main screens
   models/            Plain data: stats, goals, XP, friendships, sharing settings
   data/              Repositories: mock data now, Firebase later
     health/          Apple Health / Health Connect source (package:health)

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import 'app_services.dart';
-import 'screens/circles_screen.dart';
-import 'screens/friends_stats_screen.dart';
-import 'screens/leaderboard_screen.dart';
-import 'screens/my_stats_screen.dart';
-import 'theme/app_colors.dart';
-import 'theme/app_theme.dart';
-import 'widgets/chunky.dart';
+import '../app_services.dart';
+import 'circles_screen.dart';
+import 'friends_stats_screen.dart';
+import 'leaderboard_screen.dart';
+import 'my_stats_screen.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
+import '../widgets/chunky.dart';
 
 // ---------------------------------------------------------------------------
 // HUB SCREEN — the main menu: My Stats / Friends' Stats / Leaderboard
@@ -38,6 +38,7 @@ Widget _myStats(AppServices s) =>
       friends: s.friends,
       stats: s.stats,
       screenTimeLog: s.screenTime,
+      deviceScreenTime: s.deviceScreenTime,
     );
 
 Widget _friendsStats(AppServices s) => FriendsStatsScreen(

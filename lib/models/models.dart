@@ -9,6 +9,7 @@ export 'dates.dart';
 export 'friend_stats.dart';
 export 'friendship.dart';
 export 'invite.dart';
+export 'league.dart';
 export 'leaderboard_entry.dart';
 export 'stat_metric.dart';
 export 'rewards.dart';

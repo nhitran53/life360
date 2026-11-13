@@ -37,7 +37,7 @@ class StreakStatus {
       other.days == days &&
       other.freezesLeft == freezesLeft &&
       other.frozenDays.length == frozenDays.length &&
-      Iterable.generate(frozenDays.length)
+      Iterable<int>.generate(frozenDays.length)
           .every((i) => other.frozenDays[i] == frozenDays[i]);
 
   @override

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import 'data/circle_repository.dart';
 import 'data/connectable_stats_repository.dart';
+import 'data/device_screen_time.dart';
 import 'data/firestore_stats_publisher.dart';
 import 'data/firestore_stats_repository.dart';
 import 'data/friends_repository.dart';
@@ -26,6 +27,7 @@ import 'data/sharing_repository.dart';
 import 'data/sharing_stats_repository.dart';
 import 'data/stats_repository.dart';
 import 'data/stats_sync.dart';
+import 'utils/platform_support.dart';
 
 /// The app's repositories, created once and passed down to screens.
 class AppServices {
@@ -37,6 +39,7 @@ class AppServices {
     CircleRepository? circles,
     SharingRepository? sharing,
     ScreenTimeLog? screenTime,
+    this.deviceScreenTime = const NoDeviceScreenTime(),
   }) : circles = circles ?? MockCircleRepository(),
        sharing = sharing ?? MockSharingRepository(),
        screenTime = screenTime ?? InMemoryScreenTimeLog() {
@@ -44,6 +47,7 @@ class AppServices {
       inner: stats,
       friends: friends,
       log: this.screenTime,
+      device: deviceScreenTime,
     );
     this.stats = SharingStatsRepository(
       inner: rawStats,
@@ -70,10 +74,7 @@ class AppServices {
   }) {
     friends ??= MockFriendsRepository();
     final mockStats = MockStatsRepository(friends: friends);
-    final onPhone =
-        !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS);
+    final onPhone = isPhone;
     // Debug only: `--dart-define=TAKEOUT_JSON=/path/daily.json` serves real
     // daily totals from a Takeout export instead of the platform store.
     const takeoutPath = String.fromEnvironment('TAKEOUT_JSON');
@@ -111,6 +112,10 @@ class AppServices {
       friends: friends,
       stats: health,
       sharing: published ?? sharing,
+      // Only Android lets apps read screen time (with usage access).
+      deviceScreenTime: canReadDeviceScreenTime
+          ? AndroidUsageScreenTime()
+          : const NoDeviceScreenTime(),
     );
     if (publishing) {
       sync = services._sync = StatsSync(
@@ -142,6 +147,9 @@ class AppServices {
 
   /// Screen time the user logs by hand. My Stats writes to it.
   final ScreenTimeLog screenTime;
+
+  /// Screen time this phone measures (Android with usage access).
+  final DeviceScreenTime deviceScreenTime;
 
   final CircleRepository circles;
 

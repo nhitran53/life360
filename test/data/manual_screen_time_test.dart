@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/app_services.dart';
+import 'package:life360/data/device_screen_time.dart';
 import 'package:life360/data/health/fake_health_source.dart';
 import 'package:life360/data/health_stats_repository.dart';
 import 'package:life360/data/manual_screen_time_repository.dart';
@@ -137,6 +138,79 @@ void main() {
 
     test('screen time is never reported as denied', () async {
       expect(repo.deniedMetrics, isNot(contains(StatMetric.screenTime)));
+    });
+  });
+
+  group('screen time from the device', () {
+    late MockFriendsRepository friends;
+    late HealthStatsRepository health;
+    late InMemoryScreenTimeLog log;
+    late FakeDeviceScreenTime device;
+    late ManualScreenTimeRepository repo;
+    final yesterday = DateTime(2026, 11, 3);
+
+    setUp(() async {
+      friends = MockFriendsRepository(clock: clock);
+      health = HealthStatsRepository(
+        source: FakeHealthSource(
+          stats: [DailyStats(userId: mockMe.id, date: today, steps: 5000)],
+        ),
+        fallback: MockStatsRepository(friends: friends, clock: clock),
+        friends: friends,
+        clock: clock,
+      );
+      await health.connect();
+      log = InMemoryScreenTimeLog();
+      device = FakeDeviceScreenTime(minutes: {yesterday: 210, today: 75});
+      repo = ManualScreenTimeRepository(
+        inner: health,
+        friends: friends,
+        log: log,
+        device: device,
+        clock: clock,
+      );
+    });
+
+    test('fills my screen time from the phone once access is on', () async {
+      final days = await repo.dailyStats(mockMe.id, from: yesterday, to: today);
+
+      expect(days.map((d) => d.date), [yesterday, today]);
+      expect(days.first.screenTimeMinutes, 210);
+      expect(days.last.screenTimeMinutes, 75);
+      expect(days.last.steps, 5000);
+    });
+
+    test('a logged day wins over what the phone measured', () async {
+      await log.setMinutes(today, 30);
+
+      final day = (await repo.dailyStats(
+        mockMe.id,
+        from: today,
+        to: today,
+      )).single;
+      expect(day.screenTimeMinutes, 30);
+    });
+
+    test('nothing is read without usage access', () async {
+      device.access = false;
+
+      final day = (await repo.dailyStats(
+        mockMe.id,
+        from: today,
+        to: today,
+      )).single;
+      expect(day.screenTimeMinutes, 0);
+      expect(device.reads, 0);
+    });
+
+    test("friends never get this phone's screen time", () async {
+      final friend = (await friends.friends()).first;
+
+      expect(
+        await repo.dailyStats(friend.id, from: today, to: today),
+        await health.dailyStats(friend.id, from: today, to: today),
+      );
+      expect(device.reads, 0);
     });
   });
 

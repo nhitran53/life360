@@ -19,3 +19,14 @@ String formatMinutes(int minutes) {
   if (h == 0) return '${m}m';
   return '${h}h ${m.toString().padLeft(2, '0')}m';
 }
+
+/// "1st", "2nd", "3rd", "11th", "23rd".
+String ordinal(int n) {
+  if (n % 100 >= 11 && n % 100 <= 13) return '${n}th';
+  return switch (n % 10) {
+    1 => '${n}st',
+    2 => '${n}nd',
+    3 => '${n}rd',
+    _ => '${n}th',
+  };
+}

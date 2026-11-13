@@ -1,9 +1,8 @@
 import 'daily_stats.dart';
 import 'weekly_summary.dart';
 
-/// How XP is earned. A simple first pass so the Overall XP leaderboard has
-/// something to rank; the full system (streak bonuses, badges, leagues) is
-/// tracked in issue #11.
+/// How XP is earned. Ranks the Overall XP leaderboard, which also decides
+/// the weekly leagues (see `league.dart`).
 ///
 /// Every stat is capped per day so one extreme day can't decide the week,
 /// and sleep / screen time reward healthy ranges rather than extremes.

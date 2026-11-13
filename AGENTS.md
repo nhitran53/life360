@@ -25,8 +25,7 @@ Target users are friend groups and classmates who want light, fun accountability
 ```
 lib/
   main.dart         # App entry (Friend360App) + animated HomeScreen ("ENTER THE ARENA")
-  hub_screen.dart   # HubScreen: My Stats / Friends' Stats / Leaderboard tiles,
-                    # plus ComingSoonPage placeholder for unbuilt screens
+  screens/          # one file per screen (hub_screen.dart: the menu of main screens)
 test/
   widget_test.dart  # Widget tests for home → hub navigation
 ```

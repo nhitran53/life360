@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data/family_store.dart';
 import '../data/friends_repository.dart';
+import '../data/league_service.dart';
 import '../data/mock_circle.dart';
 import '../data/mock_friends_repository.dart';
 import '../data/mock_stats_repository.dart';
@@ -15,7 +16,11 @@ import '../theme/app_theme.dart';
 import '../theme/stat_colors.dart';
 import '../utils/format.dart';
 import '../widgets/chunky.dart';
+import '../widgets/league_card.dart';
 import 'my_stats_screen.dart';
+
+part 'leaderboard/scope_picker.dart';
+part 'leaderboard/podium_and_rows.dart';
 
 // ---------------------------------------------------------------------------
 // LEADERBOARD — weekly ranking among friends, top 3 on a podium
@@ -130,6 +135,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   /// Keyed by [_key] so each family + board is only loaded once.
   final _cache = <String, Future<_BoardData>>{};
+
+  /// Your league, between all your friends. Loaded the first time the
+  /// Overall XP board is shown for all friends.
+  late final Future<LeagueStanding> _league = LeagueService(
+    stats: _stats,
+    friends: _friends,
+    clock: _clock,
+  ).standing();
 
   String get _key => '${_family?.id ?? 'friends'}/${_board.name}';
 
@@ -255,6 +268,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       key: ValueKey(_key),
                       board: _board,
                       data: snapshot.data!,
+                      // Leagues are between all your friends, so they only
+                      // show on the friends-wide XP board.
+                      leagueCard: _board == LeaderboardBoard.xp &&
+                              family == null
+                          ? _LeagueSlot(standing: _league)
+                          : null,
                       // Only for a family with nobody else in it yet. A
                       // board can also be short because people keep a
                       // stat private; _BoardView explains that instead.
@@ -273,189 +292,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// FAMILY PICKER — whose leaderboard: all friends or one of your families
-// ---------------------------------------------------------------------------
-
-class _ScopeButton extends StatelessWidget {
-  const _ScopeButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: ChunkySurface(
-        key: const ValueKey('scope-button'),
-        color: AppColors.surface,
-        edgeColor: AppColors.border,
-        borderColor: AppColors.border,
-        radius: AppRadius.chip,
-        depth: AppDepth.chip,
-        semanticLabel: 'Showing $label. Switch leaderboard',
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        onTap: onTap,
-        child: SizedBox(
-          height: 44,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.groups_rounded, size: 20, color: AppColors.ink),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelLarge
-                      ?.copyWith(color: AppColors.ink, letterSpacing: 0),
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(Icons.expand_more_rounded,
-                  size: 22, color: AppColors.inkSoft),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// What the sheet closes with. [family] null = all friends.
-class _ScopeChoice {
-  const _ScopeChoice(this.family);
-  final CircleFamily? family;
-}
-
-class _ScopeSheet extends StatelessWidget {
-  const _ScopeSheet({required this.families, required this.selected});
-
-  final List<CircleFamily> families;
-
-  /// Null = all friends.
-  final CircleFamily? selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Whose leaderboard?', style: text.titleLarge),
-            const SizedBox(height: 2),
-            Text('Compare with all your friends or one family',
-                style: text.bodySmall),
-            const SizedBox(height: 16),
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _ScopeOption(
-                      icon: Icons.public_rounded,
-                      title: 'All friends',
-                      subtitle: 'Everyone you’ve added',
-                      selected: selected == null,
-                      onTap: () =>
-                          Navigator.of(context).pop(const _ScopeChoice(null)),
-                    ),
-                    for (final family in families) ...[
-                      const SizedBox(height: 10),
-                      _ScopeOption(
-                        icon: Icons.groups_rounded,
-                        title: family.name,
-                        subtitle: family.memberCount == 1
-                            ? 'Just you so far'
-                            : '${family.memberCount} members',
-                        selected: family.id == selected?.id,
-                        onTap: () =>
-                            Navigator.of(context).pop(_ScopeChoice(family)),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ScopeOption extends StatelessWidget {
-  const _ScopeOption({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-
-    return ChunkySurface(
-      color: selected ? AppColors.primaryTint : AppColors.surface,
-      edgeColor: selected ? AppColors.primaryDark : AppColors.border,
-      borderColor: selected ? AppColors.primary : AppColors.border,
-      radius: AppRadius.card,
-      depth: AppDepth.card,
-      selected: selected,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.surfaceSunken,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 22, color: AppColors.ink),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: text.titleSmall),
-                Text(subtitle, style: text.bodySmall),
-              ],
-            ),
-          ),
-          if (selected)
-            const Icon(Icons.check_circle_rounded,
-                color: AppColors.primary, size: 24),
-        ],
       ),
     );
   }
@@ -537,10 +373,14 @@ class _BoardView extends StatelessWidget {
     required this.board,
     required this.data,
     this.soloText,
+    this.leagueCard,
   });
 
   final LeaderboardBoard board;
   final _BoardData data;
+
+  /// Shown above the podium (Overall XP, all friends).
+  final Widget? leagueCard;
 
   /// Shown instead of a one-person podium (e.g. a brand-new family).
   final String? soloText;
@@ -578,10 +418,12 @@ class _BoardView extends StatelessWidget {
     final top = entries.take(3).toList();
     final rest = entries.skip(3).toList();
     final text = Theme.of(context).textTheme;
+    final leagueCard = this.leagueCard;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
+        if (leagueCard != null) ...[leagueCard, const SizedBox(height: 16)],
         Text(board.caption, style: text.bodySmall),
         const SizedBox(height: 16),
         _Podium(board: board, top: top, data: data),
@@ -597,302 +439,21 @@ class _BoardView extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// PODIUM — 2nd / 1st / 3rd blocks that rise in
-// ---------------------------------------------------------------------------
+/// The league card once [standing] loads. Nothing while loading or if it
+/// fails: the leaderboard itself is what matters on this screen.
+class _LeagueSlot extends StatelessWidget {
+  const _LeagueSlot({required this.standing});
 
-class _Medal {
-  const _Medal(this.color, this.edge, this.blockHeight);
-  final Color color;
-  final Color edge;
-  final double blockHeight;
-}
-
-const _medals = [
-  _Medal(AppColors.gold, AppColors.goldDark, 112),
-  _Medal(AppColors.silver, AppColors.silverDark, 80),
-  _Medal(AppColors.bronze, AppColors.bronzeDark, 56),
-];
-
-class _Podium extends StatefulWidget {
-  const _Podium({required this.board, required this.top, required this.data});
-
-  final LeaderboardBoard board;
-  final List<LeaderboardEntry> top;
-  final _BoardData data;
+  final Future<LeagueStanding> standing;
 
   @override
-  State<_Podium> createState() => _PodiumState();
-}
-
-class _PodiumState extends State<_Podium> with SingleTickerProviderStateMixin {
-  late final AnimationController _rise = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
+  Widget build(BuildContext context) => FutureBuilder<LeagueStanding>(
+    future: standing,
+    builder: (context, snapshot) {
+      final data = snapshot.data;
+      return data == null ? const SizedBox.shrink() : LeagueCard(standing: data);
+    },
   );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_rise.isAnimating || _rise.isCompleted) return;
-    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    reduceMotion ? _rise.value = 1 : _rise.forward();
-  }
-
-  @override
-  void dispose() {
-    _rise.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Visual order: 2nd, 1st, 3rd. Bronze rises first, gold last.
-    const order = [1, 0, 2];
-    const starts = [0.3, 0.15, 0.0];
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        for (final place in order)
-          Expanded(
-            child: place < widget.top.length
-                ? _PodiumSpot(
-              key: ValueKey('podium-${place + 1}'),
-              board: widget.board,
-              entry: widget.top[place],
-              medal: _medals[place],
-              isMe: widget.top[place].user.id == widget.data.meId,
-              movement: widget.data.movement(widget.top[place]),
-              rise: CurvedAnimation(
-                parent: _rise,
-                curve: Interval(starts[place], starts[place] + 0.7,
-                    curve: Curves.easeOutBack),
-              ),
-            )
-                : const SizedBox.shrink(),
-          ),
-      ],
-    );
-  }
-}
-
-class _PodiumSpot extends StatelessWidget {
-  const _PodiumSpot({
-    super.key,
-    required this.board,
-    required this.entry,
-    required this.medal,
-    required this.isMe,
-    required this.movement,
-    required this.rise,
-  });
-
-  final LeaderboardBoard board;
-  final LeaderboardEntry entry;
-  final _Medal medal;
-  final bool isMe;
-  final int? movement;
-  final Animation<double> rise;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final first = entry.rank == 1 && medal.color == AppColors.gold;
-    final value = board.format(entry.value);
-
-    return Semantics(
-      label: '${ordinal(entry.rank)} place, ${entry.user.displayName}, $value'
-          '${movementPhrase(movement)}',
-      container: true,
-      excludeSemantics: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (first)
-              const Icon(Icons.emoji_events_rounded,
-                  color: AppColors.gold, size: 28),
-            _Avatar(
-              emoji: entry.user.avatarEmoji,
-              size: first ? 68 : 56,
-              ringColor: isMe ? AppColors.primary : medal.color,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              entry.user.displayName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: text.titleSmall,
-            ),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: text.bodySmall,
-            ),
-            const SizedBox(height: 2),
-            _Movement(delta: movement),
-            const SizedBox(height: 8),
-            // The block grows from the floor (and bounces a little).
-            AnimatedBuilder(
-              animation: rise,
-              builder: (context, child) => ChunkySurface(
-                color: medal.color,
-                edgeColor: medal.edge,
-                radius: AppRadius.chip,
-                child: SizedBox(
-                  height: math.max(0, medal.blockHeight * rise.value),
-                  child: ClipRect(child: child),
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  '${entry.rank}',
-                  style: text.headlineLarge?.copyWith(color: AppColors.ink),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// NUDGE LINE — how far you are from the next spot
-// ---------------------------------------------------------------------------
-
-class _NudgeLine extends StatelessWidget {
-  const _NudgeLine({required this.board, required this.data});
-
-  final LeaderboardBoard board;
-  final _BoardData data;
-
-  @override
-  Widget build(BuildContext context) {
-    return ChunkyCard(
-      key: const ValueKey('nudge'),
-      color: AppColors.surfaceSunken,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Text(
-        nudgeMessage(
-          board,
-          data.entries,
-          data.meId,
-          youKeepPrivate: data.youKeepPrivate,
-        ),
-        style: Theme.of(context).textTheme.bodyMedium,
-      ),
-    );
-  }
-}
-
-/// Friendly one-liner about the gap to the person right above you.
-///
-/// [youKeepPrivate]: you're off this board because you don't share its stat.
-String nudgeMessage(
-  LeaderboardBoard board,
-  List<LeaderboardEntry> entries,
-  String meId, {
-  bool youKeepPrivate = false,
-}) {
-  final i = entries.indexWhere((e) => e.user.id == meId);
-  if (i == -1) {
-    return youKeepPrivate
-        ? "You keep this one private, so you're not on this board 🔒"
-        : 'Sync your stats to join the race 🏁';
-  }
-  final me = entries[i];
-  if (me.rank == 1) {
-    return entries.length > 1 && entries[1].rank == 1
-        ? "You're tied for first. Time for a tiebreaker 👀"
-        : "You're #1 this week. Don't get comfy 👑";
-  }
-  final ahead = entries.lastWhere((e) => e.rank < me.rank);
-  final gap = (ahead.value - me.value).abs().round();
-  final name = ahead.user.displayName;
-  return switch (board) {
-    LeaderboardBoard.xp => '${formatThousands(gap)} XP to pass $name 👀',
-    LeaderboardBoard.steps =>
-    "You're ${formatThousands(gap)} steps behind $name 👀",
-    LeaderboardBoard.sleep =>
-    '${formatMinutes(gap)} more sleep a night to pass $name 😴',
-    LeaderboardBoard.workout =>
-    '${formatThousands(gap)} workout minutes to pass $name 💪',
-    LeaderboardBoard.screenTime =>
-    'Cut ${formatMinutes(gap)} a day to pass $name 📵',
-  };
-}
-
-// ---------------------------------------------------------------------------
-// RANK ROW — 4th place and below
-// ---------------------------------------------------------------------------
-
-class _RankRow extends StatelessWidget {
-  const _RankRow({required this.board, required this.entry, required this.data});
-
-  final LeaderboardBoard board;
-  final LeaderboardEntry entry;
-  final _BoardData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final isMe = entry.user.id == data.meId;
-    final movement = data.movement(entry);
-    final value = board.format(entry.value);
-
-    return Semantics(
-      label: '${ordinal(entry.rank)} place, ${entry.user.displayName}, $value'
-          '${movementPhrase(movement)}',
-      container: true,
-      excludeSemantics: true,
-      child: ChunkyCard(
-        key: ValueKey('row-${entry.user.id}'),
-        color: isMe ? AppColors.primaryTint : AppColors.surface,
-        borderColor: isMe ? AppColors.primary : AppColors.border,
-        edgeColor: isMe ? AppColors.primaryDark : AppColors.border,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 28,
-              child: Text('${entry.rank}',
-                  style: text.titleMedium?.copyWith(color: AppColors.inkSoft)),
-            ),
-            _Avatar(emoji: entry.user.avatarEmoji, size: 44),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(entry.user.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.titleSmall),
-                  Text('@${entry.user.username}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.bodySmall),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(value, style: text.titleSmall),
-                _Movement(delta: movement),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -996,16 +557,6 @@ String weekResetLabel(DateTime now) {
     return 'Resets in $h ${h == 1 ? 'hour' : 'hours'}';
   }
   return 'Resets in ${math.max(1, left.inMinutes)} min';
-}
-
-String ordinal(int n) {
-  if (n % 100 >= 11 && n % 100 <= 13) return '${n}th';
-  return switch (n % 10) {
-    1 => '${n}st',
-    2 => '${n}nd',
-    3 => '${n}rd',
-    _ => '${n}th',
-  };
 }
 
 String movementPhrase(int? delta) {

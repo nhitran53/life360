@@ -71,7 +71,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
   Future<void> _save(SharingSettings settings) async {
     try {
       await _repo.update(_userId, settings);
-    } catch (_) {
+    } on Exception {
       if (mounted) showCircleSnack(context, "Couldn't save that. Try again.");
     }
   }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:life360/hub_screen.dart';
+import 'package:life360/screens/hub_screen.dart';
 import 'package:life360/screens/circles_screen.dart';
 
 void main() {

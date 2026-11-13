@@ -4,11 +4,13 @@
 // tests don't depend on exactly how long it runs.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:life360/data/device_screen_time.dart';
 import 'package:life360/data/family_store.dart';
-import 'package:life360/hub_screen.dart';
+import 'package:life360/screens/hub_screen.dart';
 import 'package:life360/screens/friends_stats_screen.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
@@ -27,6 +29,23 @@ void useTallPhone(WidgetTester tester) {
 void main() {
   // The app's services remember the health connection in shared_preferences.
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  // Tests run as Android, so the app reads screen time through the native
+  // usage stats channel. Stand in for it: usage access is off.
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel(AndroidUsageScreenTime.channelName),
+          (call) async => call.method == 'hasUsageAccess' ? false : null,
+        );
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel(AndroidUsageScreenTime.channelName),
+          null,
+        );
+  });
 
   testWidgets('Home screen shows logo, name, tagline and button',
           (WidgetTester tester) async {
