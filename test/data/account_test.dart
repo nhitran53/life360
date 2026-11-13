@@ -363,13 +363,116 @@ void main() {
       expect(session.status, AccountStatus.signedOut);
     });
   });
+
+  group('AccountSession when deleting fails part way', () {
+    late _RefusingAuth auth;
+    late _FlakyProfiles profiles;
+    late AccountSession session;
+
+    setUp(() {
+      auth = _RefusingAuth();
+      profiles = _FlakyProfiles();
+      session = AccountSession(auth: auth, profiles: profiles);
+    });
+
+    tearDown(() {
+      session.dispose();
+      auth.dispose();
+    });
+
+    Future<String> signUpAndOnboard() async {
+      await auth.signUpWithEmail('nhi@example.com', 'password1');
+      await settle();
+      await session.completeOnboarding(
+        displayName: 'Nhi',
+        username: 'nhi',
+        avatarEmoji: '🦊',
+        goals: const DailyGoals(),
+      );
+      expect(session.status, AccountStatus.ready);
+      return session.user!.uid;
+    }
+
+    test('a refused login delete drops the stale profile', () async {
+      final uid = await signUpAndOnboard();
+      auth.refuseDelete = true;
+
+      await expectLater(
+        session.deleteAccount(),
+        throwsA(
+          isA<AuthException>().having(
+            (e) => e.code,
+            'code',
+            AuthException.requiresRecentLogin,
+          ),
+        ),
+      );
+
+      // The data is gone but the login is still there: the app must not
+      // keep showing the old profile.
+      expect(await profiles.profileFor(uid), isNull);
+      expect(session.user?.uid, uid);
+      expect(session.status, AccountStatus.needsProfile);
+      expect(session.profile, isNull);
+    });
+
+    test('if the reload fails too, it offers Try again', () async {
+      await signUpAndOnboard();
+      auth
+        ..refuseDelete = true
+        ..beforeRefusing = () => profiles.failing = true;
+
+      await expectLater(session.deleteAccount(), throwsA(isA<AuthException>()));
+      expect(session.status, AccountStatus.loadFailed);
+      expect(session.profile, isNull);
+
+      profiles.failing = false;
+      await session.retry();
+      expect(session.status, AccountStatus.needsProfile);
+    });
+
+    test('a failed data delete keeps the account as it was', () async {
+      final uid = await signUpAndOnboard();
+      profiles.failDelete = true;
+
+      await expectLater(session.deleteAccount(), throwsA(isA<Exception>()));
+      expect(session.status, AccountStatus.ready);
+      expect(session.profile?.id, uid);
+      expect(auth.currentUser?.uid, uid);
+    });
+  });
+}
+
+/// Refuses to delete the login while [refuseDelete] is set, like Firebase
+/// does when it disagrees that the sign-in was recent.
+class _RefusingAuth extends MockAuthRepository {
+  var refuseDelete = false;
+
+  /// Runs just before refusing, e.g. to make the next profile load fail.
+  void Function()? beforeRefusing;
+
+  @override
+  Future<void> deleteAccount() async {
+    if (!refuseDelete) return super.deleteAccount();
+    beforeRefusing?.call();
+    throw const AuthException(
+      AuthException.requiresRecentLogin,
+      'For safety, log out and back in, then try again.',
+    );
+  }
 }
 
 /// Fails like an offline or refused Firestore read while [failing] (profile)
-/// or [failGoals] (goals) is set.
+/// or [failGoals] (goals) is set, and fails deletes while [failDelete] is.
 class _FlakyProfiles extends MockProfileRepository {
   var failing = false;
   var failGoals = false;
+  var failDelete = false;
+
+  @override
+  Future<void> deleteProfile(String uid) => failDelete
+      ? Future.error(Exception('unavailable'))
+      : super.deleteProfile(uid);
 
   @override
   Future<UserProfile?> profileFor(String uid) =>
