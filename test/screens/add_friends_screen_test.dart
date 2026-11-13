@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/data/mock_data.dart';
@@ -6,6 +7,31 @@ import 'package:life360/models/models.dart';
 import 'package:life360/screens/add_friends_screen.dart';
 import 'package:life360/screens/friends_stats_screen.dart';
 import 'package:life360/theme/app_theme.dart';
+
+/// Fails like an offline Firestore would, while the flags are on.
+class _OfflineFriends extends MockFriendsRepository {
+  _OfflineFriends({super.clock});
+
+  var failSend = false;
+  var failSearch = false;
+
+  static final _offline = FirebaseException(
+    plugin: 'cloud_firestore',
+    code: 'unavailable',
+  );
+
+  @override
+  Future<Friendship> sendRequest(String userId) =>
+      failSend ? Future.error(_offline) : super.sendRequest(userId);
+
+  @override
+  Future<List<UserProfile>> searchUsers(String query) =>
+      failSearch ? Future.error(_offline) : super.searchUsers(query);
+
+  @override
+  Future<UserProfile?> findByFriendCode(String code) =>
+      failSearch ? Future.error(_offline) : super.findByFriendCode(code);
+}
 
 void main() {
   DateTime clock() => DateTime(2026, 3, 11, 12);
@@ -150,5 +176,43 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.byKey(const ValueKey('friend-u_fin')), findsOneWidget);
+  });
+
+  testWidgets('a network error frees the button and says so', (tester) async {
+    final offline = _OfflineFriends(clock: clock);
+    friends = offline;
+    await pumpScreen(tester);
+
+    await search(tester, 'gia999');
+    offline.failSend = true;
+    await tapIn(tester, 'result-u_gia', 'Add');
+
+    expect(
+      find.text("That didn't go through. Check your connection and try again."),
+      findsOneWidget,
+    );
+    expect(await friends.outgoingRequests(), isEmpty);
+
+    // Back online: the same button works again.
+    offline.failSend = false;
+    await tapIn(tester, 'result-u_gia', 'Add');
+    expect(find.text('Request sent to Gia 👋'), findsOneWidget);
+  });
+
+  testWidgets('a failed search shows a message instead of throwing', (
+    tester,
+  ) async {
+    final offline = _OfflineFriends(clock: clock);
+    friends = offline;
+    await pumpScreen(tester);
+
+    offline.failSearch = true;
+    await search(tester, '@alex');
+
+    expect(
+      find.text("Couldn't search right now. Check your connection."),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('result-u_alex')), findsNothing);
   });
 }

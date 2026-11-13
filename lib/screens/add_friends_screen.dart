@@ -97,8 +97,18 @@ class _AddFriendsScreenState extends State<AddFriendsScreen> {
   Future<void> _search(String input) async {
     final token = ++_searchToken;
     final code = friendCodeFrom(input);
-    final byCode = code == null ? null : await _repo.findByFriendCode(code);
-    final byName = await _repo.searchUsers(input);
+    final UserProfile? byCode;
+    final List<UserProfile> byName;
+    try {
+      byCode = code == null ? null : await _repo.findByFriendCode(code);
+      byName = await _repo.searchUsers(input);
+    } on Exception catch (e) {
+      debugPrint('Friend search failed: ${e.runtimeType}');
+      if (!mounted || token != _searchToken) return;
+      setState(() => _results = const []);
+      _showMessage("Couldn't search right now. Check your connection.");
+      return;
+    }
     if (!mounted || token != _searchToken) return;
     final me = _me?.id;
     setState(() {
@@ -129,24 +139,34 @@ class _AddFriendsScreenState extends State<AddFriendsScreen> {
       await action();
     } on FriendRequestException catch (e) {
       message = e.message;
+    } on Exception catch (e) {
+      // Offline, timeout or permission denied: never leave buttons stuck.
+      debugPrint('Friend action failed: ${e.runtimeType}');
+      message = "That didn't go through. Check your connection and try again.";
     }
-    await _reload();
-    if (!mounted) return;
-    setState(() => _busy.remove(user.id));
-    if (_query.text.isNotEmpty) await _search(_query.text);
+    try {
+      await _reload();
+      if (mounted && _query.text.isNotEmpty) await _search(_query.text);
+    } finally {
+      if (mounted) setState(() => _busy.remove(user.id));
+    }
+    _showMessage(message);
+  }
+
+  void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _add(UserProfile u) => _act(
+  Future<void> _add(UserProfile u) => _act(
     u,
     () => _repo.sendRequest(u.id),
     'Request sent to ${u.displayName} 👋',
   );
 
-  void _respond(_Request r, {required bool accept}) => _act(
+  Future<void> _respond(_Request r, {required bool accept}) => _act(
     r.user,
     () => _repo.respondToRequest(r.friendship.id, accept: accept),
     accept
@@ -154,7 +174,7 @@ class _AddFriendsScreenState extends State<AddFriendsScreen> {
         : 'Request from ${r.user.displayName} declined',
   );
 
-  void _cancel(_Request r) => _act(
+  Future<void> _cancel(_Request r) => _act(
     r.user,
     () => _repo.cancelRequest(r.friendship.id),
     'Request to ${r.user.displayName} canceled',
