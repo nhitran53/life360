@@ -163,6 +163,118 @@ class CircleSectionLabel extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// GROUPS — labeled white boxes with a green outline (Privacy, Nudges)
+// ---------------------------------------------------------------------------
+
+/// Thickness of the green outline on Circle boxes.
+const circleOutline = 2.5;
+
+/// Small grey heading above a group, with optional green text on the right.
+class CircleGroupLabel extends StatelessWidget {
+  const CircleGroupLabel(this.label, {super.key, this.trailing});
+
+  final String label;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final trailing = this.trailing;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+      child: Row(
+        children: [
+          Expanded(child: CircleSectionLabel(label)),
+          if (trailing != null)
+            Text(
+              trailing,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primaryText,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// White box with a green outline; [rows] are separated by thin dividers.
+class CircleGroup extends StatelessWidget {
+  const CircleGroup({super.key, required this.rows, this.dividerIndent = 64});
+
+  final List<Widget> rows;
+
+  /// Where dividers start, so they line up with the row text.
+  final double dividerIndent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: CircleColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(
+          color: AppColors.primarySoft,
+          width: circleOutline,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: dividerIndent,
+                color: CircleColors.divider,
+              ),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Emoji on a soft green circle at the start of a row.
+class CircleEmojiBubble extends StatelessWidget {
+  const CircleEmojiBubble(this.emoji, {super.key});
+
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: AppColors.primaryTint,
+          shape: BoxShape.circle,
+        ),
+        child: Text(emoji, style: const TextStyle(fontSize: 18)),
+      ),
+    );
+  }
+}
+
+/// The on/off switch from the design exports (tap the whole row to flip it).
+class CircleSwitch extends StatelessWidget {
+  const CircleSwitch({super.key, required this.value});
+
+  final bool value;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleSvg(value ? 'switch_on' : 'switch_off', size: 46, height: 28);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // BUTTONS — dark filled pill and white outlined pill
 // ---------------------------------------------------------------------------
 
@@ -178,6 +290,7 @@ class CirclePillButton extends StatelessWidget {
     this.fontWeight = FontWeight.w700,
     this.horizontalPadding = 14,
     this.filled = false,
+    this.fillColor = CircleColors.ink,
     this.borderColor = CircleColors.outline,
     this.textColor = CircleColors.ink,
   });
@@ -195,6 +308,9 @@ class CirclePillButton extends StatelessWidget {
 
   /// Dark ink fill with white text; otherwise white with an outline.
   final bool filled;
+
+  /// Background when [filled].
+  final Color fillColor;
   final Color borderColor;
   final Color textColor;
 
@@ -204,7 +320,7 @@ class CirclePillButton extends StatelessWidget {
     final icon = this.icon;
 
     return Material(
-      color: filled ? CircleColors.ink : CircleColors.surface,
+      color: filled ? fillColor : CircleColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: radius,
         side: filled ? BorderSide.none : BorderSide(color: borderColor),

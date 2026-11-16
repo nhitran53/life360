@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_circle.dart';
+import '../theme/app_colors.dart';
 import '../theme/circle_colors.dart';
 import '../widgets/circle_widgets.dart';
 
@@ -59,7 +60,7 @@ class _NudgeScreenState extends State<NudgeScreen> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -67,99 +68,135 @@ class _NudgeScreenState extends State<NudgeScreen> {
             title: 'Send a nudge',
             subtitle: 'A friendly note to get someone moving',
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 20),
 
-          // TO
-          const CircleSectionLabel('To'),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final member in circleNudgeMembers) ...[
-                  if (member != circleNudgeMembers.first)
-                    const SizedBox(width: 6),
-                  _RecipientChip(
-                    member: member,
-                    selected: member == _recipient,
-                    onTap: () => setState(() => _recipient = member),
+          // 1. Who
+          const CircleGroupLabel('Who are you nudging?'),
+          CircleGroup(
+            rows: [
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final member in circleNudgeMembers)
+                      _RecipientChip(
+                        member: member,
+                        selected: member == _recipient,
+                        onTap: () => setState(() => _recipient = member),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.directions_walk_rounded,
+                      size: 18,
+                      color: AppColors.primaryText,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _recipient.nudgeHint,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: CircleColors.secondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            dividerIndent: 0,
+          ),
+          const SizedBox(height: 22),
+
+          // 2. Message: quick picks, then the note itself
+          const CircleGroupLabel('Pick a message'),
+          CircleGroup(
+            dividerIndent: 46,
+            rows: [
+              for (var i = 0; i < circleQuickNotes.length; i++)
+                _QuickNote(
+                  text: circleQuickNotes[i],
+                  selected: i == _quickNote,
+                  onTap: () => _pickNote(i),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ValueListenableBuilder(
+            valueListenable: _note,
+            builder: (context, value, _) =>
+                _NoteBox(
+                  controller: _note,
+                  length: value.text.length,
+                  onChanged: _onNoteEdited,
+                ),
+          ),
+          const SizedBox(height: 22),
+
+          // 3. Extra
+          const CircleGroupLabel('Make it a challenge'),
+          CircleGroup(
+            rows: [
+              Semantics(
+                toggled: _challenge,
+                child: InkWell(
+                  onTap: () => setState(() => _challenge = !_challenge),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        const CircleEmojiBubble('🏁'),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Attach a challenge',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: CircleColors.ink,
+                                ),
+                              ),
+                              SizedBox(height: 1),
+                              Text(
+                                '2,000 steps by 8 PM',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: CircleColors.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        CircleSwitch(value: _challenge),
+                      ],
+                    ),
                   ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _recipient.nudgeHint,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: CircleColors.secondary,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // QUICK NOTES
-          const CircleSectionLabel('Quick notes'),
-          for (var i = 0; i < circleQuickNotes.length; i++) ...[
-            const SizedBox(height: 8),
-            _QuickNote(
-              text: circleQuickNotes[i],
-              selected: i == _quickNote,
-              onTap: () => _pickNote(i),
-            ),
-          ],
-          const SizedBox(height: 14),
-
-          // YOUR NOTE
-          const CircleSectionLabel('Your note'),
-          const SizedBox(height: 8),
-          Container(
-            constraints: const BoxConstraints(minHeight: 76),
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-            decoration: BoxDecoration(
-              color: CircleColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: CircleColors.outline),
-            ),
-            child: TextField(
-              controller: _note,
-              onChanged: _onNoteEdited,
-              minLines: 2,
-              maxLines: 4,
-              maxLength: 140,
-              buildCounter: (
-                _, {
-                required currentLength,
-                required isFocused,
-                maxLength,
-              }) => null,
-              textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(
-                fontSize: 15,
-                height: 21 / 15,
-                fontWeight: FontWeight.w500,
-                color: CircleColors.ink,
+                ),
               ),
-              decoration: const InputDecoration.collapsed(
-                hintText: 'Write something encouraging…',
-              ),
-            ),
+            ],
           ),
-          const SizedBox(height: 14),
-
-          // CHALLENGE
-          _ChallengeToggle(
-            value: _challenge,
-            onChanged: (v) => setState(() => _challenge = v),
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 24),
 
           CirclePillButton(
             label: 'Send to ${_recipient.name}',
             icon: 'icon_send_18',
             iconSize: 18,
             filled: true,
+            fillColor: AppColors.primary,
             height: 54,
             fontSize: 15,
             fontWeight: FontWeight.w800,
@@ -189,34 +226,35 @@ class _RecipientChip extends StatelessWidget {
       selected: selected,
       button: true,
       child: Material(
-        color: selected ? CircleColors.surface : CircleColors.divider,
+        color: selected ? AppColors.primaryTint : CircleColors.surface,
         shape: StadiumBorder(
-          side: selected
-              ? const BorderSide(color: CircleColors.ink, width: 2)
-              : BorderSide.none,
+          side: BorderSide(
+            color: selected ? AppColors.primary : CircleColors.border,
+            width: 2,
+          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: Container(
             height: 44,
-            padding: const EdgeInsets.only(left: 4, right: 10),
+            padding: const EdgeInsets.only(left: 4, right: 12),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 MemberAvatar(
                   initial: member.initial,
                   color: member.color,
-                  size: 30,
+                  size: 32,
                   fontSize: 12,
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 6),
                 Text(
                   member.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: CircleColors.ink,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                    color: selected ? AppColors.primaryText : CircleColors.ink,
                   ),
                 ),
               ],
@@ -245,30 +283,22 @@ class _QuickNote extends StatelessWidget {
       selected: selected,
       inMutuallyExclusiveGroup: true,
       child: Material(
-        color: selected ? CircleColors.surface : CircleColors.noteBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-            color: selected ? CircleColors.ink : CircleColors.border,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
+        color: selected ? AppColors.primaryTint : CircleColors.surface,
         child: InkWell(
           onTap: onTap,
           child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
                 CircleSvg(selected ? 'radio_on' : 'radio_off', size: 18),
-                const SizedBox(width: 10),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(
                     text,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                       color: CircleColors.ink,
                     ),
                   ),
@@ -282,62 +312,83 @@ class _QuickNote extends StatelessWidget {
   }
 }
 
-class _ChallengeToggle extends StatelessWidget {
-  const _ChallengeToggle({required this.value, required this.onChanged});
+/// The note you'll send, with a character count.
+class _NoteBox extends StatelessWidget {
+  const _NoteBox({
+    required this.controller,
+    required this.length,
+    required this.onChanged,
+  });
 
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  static const maxLength = 140;
+
+  final TextEditingController controller;
+  final int length;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      checked: value,
-      child: Material(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
         color: CircleColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: CircleColors.border),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => onChanged(!value),
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: value ? CircleColors.ink : CircleColors.surface,
-                    borderRadius: BorderRadius.circular(5),
-                    border: value
-                        ? null
-                        : Border.all(
-                            color: CircleColors.checkboxOff,
-                            width: 1.5,
-                          ),
-                  ),
-                  child: value ? const CircleSvg('icon_check', size: 14) : null,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primarySoft, width: circleOutline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.edit_rounded, size: 16, color: AppColors.primaryText),
+              SizedBox(width: 6),
+              Text(
+                'Your note',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primaryText,
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Attach a challenge: 2,000 steps by 8 PM',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: CircleColors.ink,
-                    ),
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            onChanged: onChanged,
+            minLines: 2,
+            maxLines: 4,
+            maxLength: maxLength,
+            buildCounter: (
+                _, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) => null,
+            textCapitalization: TextCapitalization.sentences,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 21 / 15,
+              fontWeight: FontWeight.w500,
+              color: CircleColors.ink,
+            ),
+            decoration: const InputDecoration.collapsed(
+              hintText: 'Write something encouraging…',
             ),
           ),
-        ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '$length/$maxLength',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: CircleColors.muted,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

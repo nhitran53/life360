@@ -37,9 +37,6 @@ const _audiences = [
   _Audience('🚶', 'Morning walkers', '8 friends', 'Steps only'),
 ];
 
-/// Same green outline as the boxes on the Circle home.
-const _outline = 2.5;
-
 class PrivacyScreen extends StatefulWidget {
   const PrivacyScreen({super.key, this.sharing, this.userId, this.clock});
 
@@ -127,7 +124,7 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           const SizedBox(height: 20),
 
           // 1. Where your stats come from
-          const _GroupLabel('Connected device'),
+          const CircleGroupLabel('Connected device'),
           _FitbitCard(
             paused: paused,
             onManage: () =>
@@ -136,18 +133,18 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           const SizedBox(height: 22),
 
           // 2. Which stats leave your phone
-          _GroupLabel(
+          CircleGroupLabel(
             'What you share',
             trailing: '$sharedCount of ${StatMetric.values.length} on',
           ),
-          _Group(
+          CircleGroup(
             rows: [
               for (final metric in StatMetric.values)
                 _SettingRow(
-                  leading: _EmojiBubble(metric.emoji),
+                  leading: CircleEmojiBubble(metric.emoji),
                   title: metric.label,
                   subtitle: _shareSubtitle(metric),
-                  trailing: _Switch(value: !settings.hidden.contains(metric)),
+                  trailing: CircleSwitch(value: !settings.hidden.contains(metric)),
                   toggled: !settings.hidden.contains(metric),
                   onTap: () => _toggle(metric),
                 ),
@@ -170,12 +167,12 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           const SizedBox(height: 22),
 
           // 3. Which circles see them
-          const _GroupLabel('Who can see it'),
-          _Group(
+          const CircleGroupLabel('Who can see it'),
+          CircleGroup(
             rows: [
               for (final audience in _audiences)
                 _SettingRow(
-                  leading: _EmojiBubble(audience.emoji),
+                  leading: CircleEmojiBubble(audience.emoji),
                   title: audience.name,
                   subtitle: audience.size,
                   trailing: CirclePillButton(
@@ -192,11 +189,11 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           const SizedBox(height: 22),
 
           // 4. Take a break
-          const _GroupLabel('Take a break'),
-          _Group(
+          const CircleGroupLabel('Take a break'),
+          CircleGroup(
             rows: [
               _SettingRow(
-                leading: _EmojiBubble(paused ? '⏸️' : '🌙'),
+                leading: CircleEmojiBubble(paused ? '⏸️' : '🌙'),
                 title: paused ? 'Sharing is paused' : 'Pause sharing',
                 subtitle: paused
                     ? 'Back on automatically in 24 h'
@@ -213,8 +210,8 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
           const SizedBox(height: 22),
 
           // 5. Account and legal
-          const _GroupLabel('Account & legal'),
-          _Group(
+          const CircleGroupLabel('Account & legal'),
+          CircleGroup(
             rows: [
               if (signedIn)
                 _NavRow(
@@ -248,70 +245,6 @@ class _PrivacyScreenState extends State<PrivacyScreen> {
 // PIECES
 // ---------------------------------------------------------------------------
 
-/// Small grey heading above a group, with optional text on the right.
-class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.label, {this.trailing});
-
-  final String label;
-  final String? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final trailing = this.trailing;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-      child: Row(
-        children: [
-          Expanded(child: CircleSectionLabel(label)),
-          if (trailing != null)
-            Text(
-              trailing,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.primaryText,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// White box with a green outline and divided rows.
-class _Group extends StatelessWidget {
-  const _Group({required this.rows});
-
-  final List<Widget> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: CircleColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: AppColors.primarySoft, width: _outline),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0)
-              const Divider(
-                height: 1,
-                thickness: 1,
-                indent: 64,
-                color: CircleColors.divider,
-              ),
-            rows[i],
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _FitbitCard extends StatelessWidget {
   const _FitbitCard({required this.paused, required this.onManage});
 
@@ -320,7 +253,7 @@ class _FitbitCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Group(
+    return CircleGroup(
       rows: [
         Padding(
           padding: const EdgeInsets.all(14),
@@ -398,29 +331,6 @@ class _StatusChip extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Emoji on a soft green circle at the start of a row.
-class _EmojiBubble extends StatelessWidget {
-  const _EmojiBubble(this.emoji);
-
-  final String emoji;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: Container(
-        width: 36,
-        height: 36,
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: AppColors.primaryTint,
-          shape: BoxShape.circle,
-        ),
-        child: Text(emoji, style: const TextStyle(fontSize: 18)),
-      ),
     );
   }
 }
@@ -550,16 +460,5 @@ class _NavRow extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _Switch extends StatelessWidget {
-  const _Switch({required this.value});
-
-  final bool value;
-
-  @override
-  Widget build(BuildContext context) {
-    return CircleSvg(value ? 'switch_on' : 'switch_off', size: 46, height: 28);
   }
 }
