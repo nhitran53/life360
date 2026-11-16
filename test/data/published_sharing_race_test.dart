@@ -126,6 +126,20 @@ void main() {
     expect(board.map((e) => e.user.id), isNot(contains(friendId)));
   });
 
+  test('a future-week read does not hide a friend sharing this week', () async {
+    final nextWeek = DateTime(2026, 3, 16);
+    final future = await stats.weeklySummary(friendId, weekOf: nextWeek);
+    expect(future.total(StatMetric.steps), 0);
+    expect(published.recordedThrough(friendId), isNull);
+
+    await stats.weeklySummary(friendId, weekOf: now);
+    final board = await stats.leaderboard(StatMetric.steps, weekOf: now);
+    expect(board.map((e) => e.user.id), contains(friendId));
+    final summary = await stats.weeklySummary(friendId, weekOf: now);
+    expect(summary.total(StatMetric.steps), 8000);
+    expect(published.settingsFor(friendId).isPaused(now), isFalse);
+  });
+
   test('a failed first read leaves the private defaults', () async {
     db.failing = true;
     await stats.weeklySummary(friendId, weekOf: now);

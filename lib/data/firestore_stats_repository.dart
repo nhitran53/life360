@@ -55,8 +55,8 @@ class FirestoreStatsRepository implements StatsRepository {
 
   /// The days of [userId] from [from] to [to], or null if the read failed.
   /// Records which metrics they contain (see [published]), unless the window
-  /// ends before the current week: an older week says nothing reliable about
-  /// what's shared now (see [_learnCurrentWeek]).
+  /// ends before the current week (an older week says nothing reliable about
+  /// what's shared now, see [_learnCurrentWeek]) or starts after it.
   Future<List<DailyStats>?> _read(
     String userId,
     DateTime from,
@@ -79,7 +79,14 @@ class FirestoreStatsRepository implements StatsRepository {
       for (final doc in snapshot.docs)
         ?_parse(userId, doc.id, doc.data(), shared),
     ]..sort((a, b) => a.date.compareTo(b.date));
-    if (!to.isBefore(_currentWeekEnd())) published?.record(userId, shared, to);
+    final weekEnd = _currentWeekEnd();
+    // Only a window that reaches the current week says what is shared now. A
+    // window wholly in the future is empty whatever the friend shares, so it
+    // records nothing; one that spans into the future records the current
+    // week's end, so it can't outrank a later read of the current week.
+    if (!to.isBefore(weekEnd) && !from.isAfter(weekEnd)) {
+      published?.record(userId, shared, weekEnd);
+    }
     return days;
   }
 
