@@ -109,6 +109,23 @@ void main() {
     },
   );
 
+  test('a failed current-week lookup leaves a hidden metric masked', () async {
+    // Last week's read succeeds (steps + sleep); only the lookup of this
+    // week, which would show sleep is hidden, fails.
+    db.readsBeforeFailing = 1;
+    final summary = await stats.weeklySummary(friendId, weekOf: lastWeek);
+    expect(summary.total(StatMetric.sleep), 0);
+    expect(published.recordedThrough(friendId), isNull);
+    expect(
+      published.settingsFor(friendId).isShared(StatMetric.sleep, now),
+      isFalse,
+    );
+
+    db.readsBeforeFailing = null;
+    final board = await stats.leaderboard(StatMetric.sleep, weekOf: lastWeek);
+    expect(board.map((e) => e.user.id), isNot(contains(friendId)));
+  });
+
   test('a failed first read leaves the private defaults', () async {
     db.failing = true;
     await stats.weeklySummary(friendId, weekOf: now);
@@ -118,13 +135,17 @@ void main() {
   });
 }
 
-/// Fails every read while [failing].
+/// Fails every read while [failing], or every read after the first
+/// [readsBeforeFailing] ones.
 class _FlakyDb extends FakeFirebaseFirestore {
   bool failing = false;
+  int? readsBeforeFailing;
 
   @override
   CollectionReference<Map<String, dynamic>> collection(String path) {
-    if (failing) {
+    final left = readsBeforeFailing;
+    if (left != null) readsBeforeFailing = left - 1;
+    if (failing || (left != null && left <= 0)) {
       throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
     }
     return super.collection(path);

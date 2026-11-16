@@ -54,7 +54,9 @@ class FirestoreStatsRepository implements StatsRepository {
   }
 
   /// The days of [userId] from [from] to [to], or null if the read failed.
-  /// Records which metrics they contain (see [published]).
+  /// Records which metrics they contain (see [published]), unless the window
+  /// ends before the current week: an older week says nothing reliable about
+  /// what's shared now (see [_learnCurrentWeek]).
   Future<List<DailyStats>?> _read(
     String userId,
     DateTime from,
@@ -77,28 +79,33 @@ class FirestoreStatsRepository implements StatsRepository {
       for (final doc in snapshot.docs)
         ?_parse(userId, doc.id, doc.data(), shared),
     ]..sort((a, b) => a.date.compareTo(b.date));
-    published?.record(userId, shared, to);
+    if (!to.isBefore(_currentWeekEnd())) published?.record(userId, shared, to);
     return days;
   }
 
-  /// What a friend shares now is read off the current week, so reading an
-  /// older week makes sure that's known first. Otherwise the older week's
-  /// metrics would be taken as current and could show a metric the friend has
-  /// since hidden. If this read fails, nothing is recorded and the earlier
-  /// answer (or the private default) stands.
-  Future<void> _learnCurrentWeek(String userId, DateTime windowEnd) async {
-    final repo = published;
-    if (repo == null) return;
+  DateTime _currentWeekEnd() {
     final weekStart = startOfWeek(_clock());
-    final weekEnd = DateTime(
-      weekStart.year,
-      weekStart.month,
-      weekStart.day + 6,
-    );
-    if (!windowEnd.isBefore(weekEnd)) return;
+    return DateTime(weekStart.year, weekStart.month, weekStart.day + 6);
+  }
+
+  final _learning = <String, Future<void>>{};
+
+  /// What a friend shares now is read off the current week, so reading an
+  /// older week makes sure that's known first. An older week's own metrics
+  /// are never recorded (see [_read]), so if this read fails nothing is
+  /// recorded and the earlier answer (or the private default) stands: a metric
+  /// the friend has since hidden can't show. Reads of the same friend that
+  /// overlap share one lookup.
+  Future<void> _learnCurrentWeek(String userId, DateTime windowEnd) {
+    final repo = published;
+    final weekEnd = _currentWeekEnd();
+    if (repo == null || !windowEnd.isBefore(weekEnd)) return Future.value();
     final known = repo.recordedThrough(userId);
-    if (known != null && !known.isBefore(weekEnd)) return;
-    await _read(userId, weekStart, weekEnd);
+    if (known != null && !known.isBefore(weekEnd)) return Future.value();
+    return _learning[userId] ??= _read(userId, startOfWeek(_clock()), weekEnd)
+        .whenComplete(() {
+          _learning.remove(userId);
+        });
   }
 
   /// Null for a document that isn't a valid day (its id must be the date).
