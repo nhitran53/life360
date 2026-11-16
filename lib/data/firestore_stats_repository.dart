@@ -13,7 +13,8 @@ import 'stats_repository.dart';
 /// A friend's document only has the metrics they share, so a missing key
 /// reads as 0 here, while a present key is a real value (0 included). Which
 /// keys were present is handed to [published], which is how the app knows
-/// what each friend shares (their settings aren't readable).
+/// what each friend shares (their settings aren't readable); only the current
+/// week counts, so older or wider windows can't change the answer.
 /// Firestore only lets accepted friends read these documents. A failed or
 /// refused read returns no days and records nothing, so it can't make a
 /// friend look like they stopped sharing.
@@ -49,15 +50,16 @@ class FirestoreStatsRepository implements StatsRepository {
     if (await _isMe(userId)) return own.dailyStats(userId, from: from, to: to);
     final days = await _read(userId, from, to);
     if (days == null) return const [];
-    await _learnCurrentWeek(userId, to);
-    return days;
+    // A window wholly in the future is empty whatever the friend shares.
+    if (!from.isAfter(_currentWeekEnd())) await _learnCurrentWeek(userId);
+    return days.days;
   }
 
-  /// The days of [userId] from [from] to [to], or null if the read failed.
-  /// Records which metrics they contain (see [published]), unless the window
-  /// ends before the current week (an older week says nothing reliable about
-  /// what's shared now, see [_learnCurrentWeek]) or starts after it.
-  Future<List<DailyStats>?> _read(
+  /// The days of [userId] from [from] to [to] and the metrics they contain,
+  /// or null if the read failed. Records nothing: what a friend shares is
+  /// only ever read off the current week (see [_learnCurrentWeek]), never
+  /// off whatever window a caller happened to ask for.
+  Future<({List<DailyStats> days, Set<StatMetric> metrics})?> _read(
     String userId,
     DateTime from,
     DateTime to,
@@ -74,20 +76,12 @@ class FirestoreStatsRepository implements StatsRepository {
     } on FirebaseException {
       return null;
     }
-    final shared = <StatMetric>{};
+    final metrics = <StatMetric>{};
     final days = [
       for (final doc in snapshot.docs)
-        ?_parse(userId, doc.id, doc.data(), shared),
+        ?_parse(userId, doc.id, doc.data(), metrics),
     ]..sort((a, b) => a.date.compareTo(b.date));
-    final weekEnd = _currentWeekEnd();
-    // Only a window that reaches the current week says what is shared now. A
-    // window wholly in the future is empty whatever the friend shares, so it
-    // records nothing; one that spans into the future records the current
-    // week's end, so it can't outrank a later read of the current week.
-    if (!to.isBefore(weekEnd) && !from.isAfter(weekEnd)) {
-      published?.record(userId, shared, weekEnd);
-    }
-    return days;
+    return (days: days, metrics: metrics);
   }
 
   DateTime _currentWeekEnd() {
@@ -95,23 +89,28 @@ class FirestoreStatsRepository implements StatsRepository {
     return DateTime(weekStart.year, weekStart.month, weekStart.day + 6);
   }
 
-  final _learning = <String, Future<void>>{};
+  final _lookups = <String, Future<void>>{};
 
-  /// What a friend shares now is read off the current week, so reading an
-  /// older week makes sure that's known first. An older week's own metrics
-  /// are never recorded (see [_read]), so if this read fails nothing is
-  /// recorded and the earlier answer (or the private default) stands: a metric
-  /// the friend has since hidden can't show. Reads of the same friend that
-  /// overlap share one lookup.
-  Future<void> _learnCurrentWeek(String userId, DateTime windowEnd) {
+  /// Reads the current week of [userId] and records which metrics it
+  /// contains. Lookups of one friend that overlap share one query, but a
+  /// finished lookup is never reused, so a friend who starts publishing
+  /// mid-week is picked up by the next read. If the query fails nothing is
+  /// recorded and the earlier answer (or the private default) stands: a
+  /// metric the friend has since hidden can't show.
+  Future<void> _learnCurrentWeek(String userId) {
     final repo = published;
-    final weekEnd = _currentWeekEnd();
-    if (repo == null || !windowEnd.isBefore(weekEnd)) return Future.value();
-    final known = repo.recordedThrough(userId);
-    if (known != null && !known.isBefore(weekEnd)) return Future.value();
-    return _learning[userId] ??= _read(userId, startOfWeek(_clock()), weekEnd)
-        .whenComplete(() {
-          _learning.remove(userId);
+    if (repo == null) return Future.value();
+    return _lookups[userId] ??=
+        () async {
+          final lookup = repo.startLookup();
+          final week = await _read(
+            userId,
+            startOfWeek(_clock()),
+            _currentWeekEnd(),
+          );
+          if (week != null) repo.record(userId, week.metrics, lookup);
+        }().whenComplete(() {
+          _lookups.remove(userId);
         });
   }
 

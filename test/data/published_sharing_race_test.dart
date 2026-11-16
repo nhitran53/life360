@@ -115,7 +115,7 @@ void main() {
     db.readsBeforeFailing = 1;
     final summary = await stats.weeklySummary(friendId, weekOf: lastWeek);
     expect(summary.total(StatMetric.sleep), 0);
-    expect(published.recordedThrough(friendId), isNull);
+    expect(published.hasRecorded(friendId), isFalse);
     expect(
       published.settingsFor(friendId).isShared(StatMetric.sleep, now),
       isFalse,
@@ -130,7 +130,7 @@ void main() {
     final nextWeek = DateTime(2026, 3, 16);
     final future = await stats.weeklySummary(friendId, weekOf: nextWeek);
     expect(future.total(StatMetric.steps), 0);
-    expect(published.recordedThrough(friendId), isNull);
+    expect(published.hasRecorded(friendId), isFalse);
 
     await stats.weeklySummary(friendId, weekOf: now);
     final board = await stats.leaderboard(StatMetric.steps, weekOf: now);
@@ -139,6 +139,41 @@ void main() {
     expect(summary.total(StatMetric.steps), 8000);
     expect(published.settingsFor(friendId).isPaused(now), isFalse);
   });
+
+  test('a spanning window does not teach what is shared', () async {
+    // Reaches this week (steps only) and last week (steps + sleep).
+    final days = await stats.dailyStats(
+      friendId,
+      from: DateTime(2026, 3, 2),
+      to: DateTime(2026, 3, 22),
+    );
+    expect(days.map((d) => d.steps), [5000, 8000]);
+    expect(
+      published.settingsFor(friendId).isShared(StatMetric.sleep, now),
+      isFalse,
+    );
+
+    final summary = await stats.weeklySummary(friendId, weekOf: lastWeek);
+    expect(summary.total(StatMetric.sleep), 0);
+    expect(summary.total(StatMetric.steps), 5000);
+  });
+
+  test(
+    'a friend who starts publishing mid-week shows on the next read',
+    () async {
+      await db.doc('users/$friendId/daily/2026-03-10').delete();
+      final before = await stats.weeklySummary(friendId, weekOf: lastWeek);
+      expect(before.total(StatMetric.steps), 0);
+      expect(published.settingsFor(friendId).isPaused(now), isTrue);
+
+      await put('2026-03-10', {'steps': 8000});
+      final after = await stats.weeklySummary(friendId, weekOf: lastWeek);
+      expect(after.total(StatMetric.steps), 5000);
+      expect(after.total(StatMetric.sleep), 0);
+      final board = await stats.leaderboard(StatMetric.steps, weekOf: lastWeek);
+      expect(board.map((e) => e.user.id), contains(friendId));
+    },
+  );
 
   test('a failed first read leaves the private defaults', () async {
     db.failing = true;
