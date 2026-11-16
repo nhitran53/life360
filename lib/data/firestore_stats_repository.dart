@@ -15,7 +15,8 @@ import 'stats_repository.dart';
 /// keys were present is handed to [published], which is how the app knows
 /// what each friend shares (their settings aren't readable).
 /// Firestore only lets accepted friends read these documents. A failed or
-/// refused read returns no days.
+/// refused read returns no days and records nothing, so it can't make a
+/// friend look like they stopped sharing.
 class FirestoreStatsRepository implements StatsRepository {
   FirestoreStatsRepository(
     this._db, {
@@ -46,6 +47,19 @@ class FirestoreStatsRepository implements StatsRepository {
     required DateTime to,
   }) async {
     if (await _isMe(userId)) return own.dailyStats(userId, from: from, to: to);
+    final days = await _read(userId, from, to);
+    if (days == null) return const [];
+    await _learnCurrentWeek(userId, to);
+    return days;
+  }
+
+  /// The days of [userId] from [from] to [to], or null if the read failed.
+  /// Records which metrics they contain (see [published]).
+  Future<List<DailyStats>?> _read(
+    String userId,
+    DateTime from,
+    DateTime to,
+  ) async {
     final QuerySnapshot<Map<String, dynamic>> snapshot;
     try {
       snapshot = await _db
@@ -56,16 +70,35 @@ class FirestoreStatsRepository implements StatsRepository {
           .where('date', isLessThanOrEqualTo: dateKey(to))
           .get();
     } on FirebaseException {
-      published?.record(userId, const {});
-      return const [];
+      return null;
     }
     final shared = <StatMetric>{};
     final days = [
       for (final doc in snapshot.docs)
         ?_parse(userId, doc.id, doc.data(), shared),
     ]..sort((a, b) => a.date.compareTo(b.date));
-    published?.record(userId, shared);
+    published?.record(userId, shared, to);
     return days;
+  }
+
+  /// What a friend shares now is read off the current week, so reading an
+  /// older week makes sure that's known first. Otherwise the older week's
+  /// metrics would be taken as current and could show a metric the friend has
+  /// since hidden. If this read fails, nothing is recorded and the earlier
+  /// answer (or the private default) stands.
+  Future<void> _learnCurrentWeek(String userId, DateTime windowEnd) async {
+    final repo = published;
+    if (repo == null) return;
+    final weekStart = startOfWeek(_clock());
+    final weekEnd = DateTime(
+      weekStart.year,
+      weekStart.month,
+      weekStart.day + 6,
+    );
+    if (!windowEnd.isBefore(weekEnd)) return;
+    final known = repo.recordedThrough(userId);
+    if (known != null && !known.isBefore(weekEnd)) return;
+    await _read(userId, weekStart, weekEnd);
   }
 
   /// Null for a document that isn't a valid day (its id must be the date).
