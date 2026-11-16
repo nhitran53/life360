@@ -51,7 +51,11 @@ class FirestoreStatsRepository implements StatsRepository {
     final days = await _read(userId, from, to);
     if (days == null) return const [];
     // A window wholly in the future is empty whatever the friend shares.
-    if (!from.isAfter(_currentWeekEnd())) await _learnCurrentWeek(userId);
+    // If what the friend shares now can't be learned, show nothing rather
+    // than mask by an allow-list the friend may have since narrowed.
+    if (!from.isAfter(_currentWeekEnd()) && !await _learnCurrentWeek(userId)) {
+      return const [];
+    }
     return days.days;
   }
 
@@ -89,17 +93,17 @@ class FirestoreStatsRepository implements StatsRepository {
     return DateTime(weekStart.year, weekStart.month, weekStart.day + 6);
   }
 
-  final _lookups = <String, Future<void>>{};
+  final _lookups = <String, Future<bool>>{};
 
   /// Reads the current week of [userId] and records which metrics it
   /// contains. Lookups of one friend that overlap share one query, but a
   /// finished lookup is never reused, so a friend who starts publishing
-  /// mid-week is picked up by the next read. If the query fails nothing is
-  /// recorded and the earlier answer (or the private default) stands: a
-  /// metric the friend has since hidden can't show.
-  Future<void> _learnCurrentWeek(String userId) {
+  /// mid-week is picked up by the next read. Returns false if the query
+  /// failed: nothing is recorded (the earlier answer stands) and the caller
+  /// must not return days, as a metric the friend has since hidden could show.
+  Future<bool> _learnCurrentWeek(String userId) {
     final repo = published;
-    if (repo == null) return Future.value();
+    if (repo == null) return Future.value(true);
     return _lookups[userId] ??=
         () async {
           final lookup = repo.startLookup();
@@ -108,7 +112,9 @@ class FirestoreStatsRepository implements StatsRepository {
             startOfWeek(_clock()),
             _currentWeekEnd(),
           );
-          if (week != null) repo.record(userId, week.metrics, lookup);
+          if (week == null) return false;
+          repo.record(userId, week.metrics, lookup);
+          return true;
         }().whenComplete(() {
           _lookups.remove(userId);
         });

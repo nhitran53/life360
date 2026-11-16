@@ -126,6 +126,39 @@ void main() {
     expect(board.map((e) => e.user.id), isNot(contains(friendId)));
   });
 
+  test('a failed lookup does not unmask a metric hidden since', () async {
+    // Sleep is published this week, and a good read records it as allowed.
+    await put('2026-03-10', {'steps': 8000, 'sleep': 400});
+    await stats.weeklySummary(friendId, weekOf: now);
+    expect(
+      published.settingsFor(friendId).isShared(StatMetric.sleep, now),
+      isTrue,
+    );
+
+    // The friend hides sleep. Last week's read works but the lookup fails.
+    await db.doc('users/$friendId/daily/2026-03-10').set({
+      'date': '2026-03-10',
+      'steps': 8000,
+    });
+    db.readsBeforeFailing = 1;
+    final summary = await stats.weeklySummary(friendId, weekOf: lastWeek);
+    expect(summary.total(StatMetric.sleep), 0);
+    expect(summary.total(StatMetric.steps), 0);
+    expect(
+      published.settingsFor(friendId).isShared(StatMetric.sleep, now),
+      isTrue,
+    );
+
+    db.readsBeforeFailing = 1;
+    // The earlier record still lists the friend, but with nothing in it:
+    // last week's sleep is not ranked.
+    final board = await stats.leaderboard(StatMetric.sleep, weekOf: lastWeek);
+    expect(
+      board.where((e) => e.user.id == friendId).map((e) => e.value),
+      everyElement(0),
+    );
+  });
+
   test('a future-week read does not hide a friend sharing this week', () async {
     final nextWeek = DateTime(2026, 3, 16);
     final future = await stats.weeklySummary(friendId, weekOf: nextWeek);
