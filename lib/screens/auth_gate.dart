@@ -13,13 +13,29 @@ import 'onboarding_screen.dart';
 // ---------------------------------------------------------------------------
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key, required this.welcome, this.signedIn});
+  const AuthGate({
+    super.key,
+    required this.welcome,
+    this.signedIn,
+    @visibleForTesting this.createServices = _defaultServices,
+  });
 
   /// Shown when nobody is signed in.
   final Widget welcome;
 
   /// Shown once signed in with a profile. Defaults to the Circle home.
   final WidgetBuilder? signedIn;
+
+  /// Makes the services for a signed-in session.
+  final AppServices Function(AccountSession session) createServices;
+
+  static AppServices _defaultServices(AccountSession session) =>
+      AppServices.defaults(
+        friends: session.friends,
+        sharing: session.sharing,
+        statsDb: session.statsDb,
+        userId: session.profile?.id,
+      );
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -28,28 +44,49 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   AccountStatus? _shown;
 
+  AccountSession? _session;
+
   /// Made once per signed-in profile, so screens keep one set of
   /// repositories (and one health connection) while you're signed in.
+  /// Created and released only by [_syncServices], never by build.
   AppServices? _services;
   String? _servicesFor;
 
-  AppServices _servicesOf(AccountSession session) {
-    final id = session.profile?.id;
-    if (_services == null || _servicesFor != id) {
-      _servicesFor = id;
-      _services?.dispose();
-      _services = AppServices.defaults(
-        friends: session.friends,
-        sharing: session.sharing,
-        statsDb: session.statsDb,
-        userId: id,
-      );
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = AccountScope.of(context);
+    if (!identical(session, _session)) {
+      _session?.removeListener(_syncServices);
+      _session = session..addListener(_syncServices);
+      _syncServices();
     }
-    return _services!;
   }
 
-  /// Stops publishing and forgets the services, so signing in again (even
-  /// as the same user) starts with fresh ones on the new session.
+  @override
+  void didUpdateWidget(AuthGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncServices();
+  }
+
+  /// Builds, replaces or releases the services to match the session. Runs on
+  /// every session change, so leaving `ready` (even briefly) always releases
+  /// them: signing in again, even as the same user, starts with fresh ones.
+  void _syncServices() {
+    final session = _session!;
+    // A custom signed-in screen brings its own repositories.
+    if (session.status != AccountStatus.ready || widget.signedIn != null) {
+      _releaseServices();
+      return;
+    }
+    final id = session.profile?.id;
+    if (_services == null || _servicesFor != id) {
+      _services?.dispose();
+      _servicesFor = id;
+      _services = widget.createServices(session);
+    }
+  }
+
   void _releaseServices() {
     _services?.dispose();
     _services = null;
@@ -58,6 +95,7 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   void dispose() {
+    _session?.removeListener(_syncServices);
     _releaseServices();
     super.dispose();
   }
@@ -76,8 +114,6 @@ class _AuthGateState extends State<AuthGate> {
     }
     _shown = status;
 
-    if (status != AccountStatus.ready) _releaseServices();
-
     return switch (status) {
       AccountStatus.loading => const Scaffold(
         body: Center(
@@ -89,7 +125,12 @@ class _AuthGateState extends State<AuthGate> {
       AccountStatus.loadFailed => _LoadFailedScreen(session: session),
       AccountStatus.ready =>
         widget.signedIn?.call(context) ??
-            CircleScreen(services: _servicesOf(session)),
+            // Keyed by the services so a replacement rebuilds the whole
+            // subtree; descendants cache repositories from their services.
+            CircleScreen(
+              key: ObjectKey(_services),
+              services: _services!,
+            ),
     };
   }
 }

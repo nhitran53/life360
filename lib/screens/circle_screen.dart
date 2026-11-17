@@ -35,6 +35,7 @@ class CircleScreen extends StatefulWidget {
     this.initialTab = CircleTab.circle,
     this.services,
     this.familyStore,
+    @visibleForTesting this.createServices = AppServices.defaults,
   });
 
   final CircleTab initialTab;
@@ -44,6 +45,9 @@ class CircleScreen extends StatefulWidget {
 
   /// Defaults to [FamilyStore.instance].
   final FamilyStore? familyStore;
+
+  /// Makes the services this screen owns when [services] is null.
+  final AppServices Function() createServices;
 
   @override
   State<CircleScreen> createState() => _CircleScreenState();
@@ -61,8 +65,12 @@ class _CircleScreenState extends State<CircleScreen> {
   /// Every family you belong to, plus any you create this session.
   late final FamilyStore _store = widget.familyStore ?? FamilyStore.instance;
 
-  /// Created on first use so My Stats keeps one connection per Circle visit.
-  late final AppServices _services = widget.services ?? AppServices.defaults();
+  /// Made on first use when none was passed, so My Stats keeps one
+  /// connection per Circle visit. Ours to dispose; passed-in services are not.
+  AppServices? _ownServices;
+
+  AppServices get _services =>
+      widget.services ?? (_ownServices ??= widget.createServices());
 
   /// The one the Circle home is showing.
   late CircleFamily _family = _store.families.first;
@@ -76,10 +84,8 @@ class _CircleScreenState extends State<CircleScreen> {
   Future<void> _openNotifications() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => NotificationsScreen(
-          unreadIds: {..._unread},
-          onNudgeBack: _nudge,
-        ),
+        builder: (_) =>
+            NotificationsScreen(unreadIds: {..._unread}, onNudgeBack: _nudge),
       ),
     );
     // Seen them all now.
@@ -166,6 +172,23 @@ class _CircleScreenState extends State<CircleScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void didUpdateWidget(CircleScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Passed-in services replace the ones we made; release ours. Going back
+    // to null makes fresh ones on next use, never reusing the disposed set.
+    if (widget.services != null) {
+      _ownServices?.dispose();
+      _ownServices = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ownServices?.dispose();
+    super.dispose();
   }
 
   @override
