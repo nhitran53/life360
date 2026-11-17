@@ -118,6 +118,7 @@ class AppServices {
           ? AndroidUsageScreenTime()
           : const NoDeviceScreenTime(),
     );
+    services._published = published;
     if (publishing) {
       sync = services._sync = StatsSync(
         source: services.rawStats,
@@ -137,12 +138,27 @@ class AppServices {
   late final ManualScreenTimeRepository _manualStats;
   StatsSync? _sync;
 
+  /// The wrapper made in [AppServices.defaults] around the caller's sharing
+  /// repository. Ours to dispose; the repository inside it is not.
+  PublishedSharingRepository? _published;
+  var _disposed = false;
+
+  /// Whether [dispose] has been called.
+  bool get isDisposed => _disposed;
+
   /// Publishes the user's stats now (e.g. after logging screen time). Does
   /// nothing when stats aren't published. Never throws.
   Future<void> syncNow() async => _sync?.sync();
 
-  /// Stops publishing stats. Call when the user signs out.
-  void dispose() => _sync?.dispose();
+  /// Stops publishing stats and detaches from the caller's sharing
+  /// repository (which stays alive: its owner disposes it). Call when the
+  /// user signs out. Safe to call more than once.
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _sync?.dispose();
+    _published?.dispose();
+  }
 
   final FriendsRepository friends;
 
