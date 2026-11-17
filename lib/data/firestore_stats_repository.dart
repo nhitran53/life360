@@ -13,9 +13,11 @@ import 'stats_repository.dart';
 /// A friend's document only has the metrics they share, so a missing key
 /// reads as 0 here, while a present key is a real value (0 included). Which
 /// keys were present is handed to [published], which is how the app knows
-/// what each friend shares (their settings aren't readable).
+/// what each friend shares (their settings aren't readable); only the current
+/// week counts, so older or wider windows can't change the answer.
 /// Firestore only lets accepted friends read these documents. A failed or
-/// refused read returns no days.
+/// refused read returns no days and records nothing, so it can't make a
+/// friend look like they stopped sharing.
 class FirestoreStatsRepository implements StatsRepository {
   FirestoreStatsRepository(
     this._db, {
@@ -46,6 +48,26 @@ class FirestoreStatsRepository implements StatsRepository {
     required DateTime to,
   }) async {
     if (await _isMe(userId)) return own.dailyStats(userId, from: from, to: to);
+    final days = await _read(userId, from, to);
+    if (days == null) return const [];
+    // A window wholly in the future is empty whatever the friend shares.
+    // If what the friend shares now can't be learned, show nothing rather
+    // than mask by an allow-list the friend may have since narrowed.
+    if (!from.isAfter(_currentWeekEnd()) && !await _learnCurrentWeek(userId)) {
+      return const [];
+    }
+    return days.days;
+  }
+
+  /// The days of [userId] from [from] to [to] and the metrics they contain,
+  /// or null if the read failed. Records nothing: what a friend shares is
+  /// only ever read off the current week (see [_learnCurrentWeek]), never
+  /// off whatever window a caller happened to ask for.
+  Future<({List<DailyStats> days, Set<StatMetric> metrics})?> _read(
+    String userId,
+    DateTime from,
+    DateTime to,
+  ) async {
     final QuerySnapshot<Map<String, dynamic>> snapshot;
     try {
       snapshot = await _db
@@ -56,16 +78,46 @@ class FirestoreStatsRepository implements StatsRepository {
           .where('date', isLessThanOrEqualTo: dateKey(to))
           .get();
     } on FirebaseException {
-      published?.record(userId, const {});
-      return const [];
+      return null;
     }
-    final shared = <StatMetric>{};
+    final metrics = <StatMetric>{};
     final days = [
       for (final doc in snapshot.docs)
-        ?_parse(userId, doc.id, doc.data(), shared),
+        ?_parse(userId, doc.id, doc.data(), metrics),
     ]..sort((a, b) => a.date.compareTo(b.date));
-    published?.record(userId, shared);
-    return days;
+    return (days: days, metrics: metrics);
+  }
+
+  DateTime _currentWeekEnd() {
+    final weekStart = startOfWeek(_clock());
+    return DateTime(weekStart.year, weekStart.month, weekStart.day + 6);
+  }
+
+  final _lookups = <String, Future<bool>>{};
+
+  /// Reads the current week of [userId] and records which metrics it
+  /// contains. Lookups of one friend that overlap share one query, but a
+  /// finished lookup is never reused, so a friend who starts publishing
+  /// mid-week is picked up by the next read. Returns false if the query
+  /// failed: nothing is recorded (the earlier answer stands) and the caller
+  /// must not return days, as a metric the friend has since hidden could show.
+  Future<bool> _learnCurrentWeek(String userId) {
+    final repo = published;
+    if (repo == null) return Future.value(true);
+    return _lookups[userId] ??=
+        () async {
+          final lookup = repo.startLookup();
+          final week = await _read(
+            userId,
+            startOfWeek(_clock()),
+            _currentWeekEnd(),
+          );
+          if (week == null) return false;
+          repo.record(userId, week.metrics, lookup);
+          return true;
+        }().whenComplete(() {
+          _lookups.remove(userId);
+        });
   }
 
   /// Null for a document that isn't a valid day (its id must be the date).

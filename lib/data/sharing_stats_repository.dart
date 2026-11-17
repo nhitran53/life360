@@ -81,16 +81,20 @@ class SharingStatsRepository implements ConnectableStatsRepository {
     required DateTime from,
     required DateTime to,
   }) async {
+    final isMe = await _isMe(userId);
     final days = await inner.dailyStats(userId, from: from, to: to);
-    if (await _isMe(userId)) return days;
+    if (isMe) return days;
     final hidden = _hiddenFor(userId);
     return [for (final d in days) maskStats(d, hidden)];
   }
 
   @override
   Future<WeeklySummary> weeklySummary(String userId, {DateTime? weekOf}) async {
+    // Decide who this is before reading, so the settings are looked up right
+    // as the read finishes, with nothing awaited in between.
+    final isMe = await _isMe(userId);
     final week = await inner.weeklySummary(userId, weekOf: weekOf);
-    if (await _isMe(userId)) return week;
+    if (isMe) return week;
     final hidden = _hiddenFor(userId);
     if (hidden.isEmpty) return week;
     return WeeklySummary.fromDays(
