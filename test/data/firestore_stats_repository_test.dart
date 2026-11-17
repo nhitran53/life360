@@ -6,7 +6,11 @@ import 'package:life360/data/firestore_stats_repository.dart';
 import 'package:life360/data/mock_data.dart';
 import 'package:life360/data/mock_friends_repository.dart';
 import 'package:life360/data/mock_stats_repository.dart';
+import 'package:life360/data/published_sharing_repository.dart';
+import 'package:life360/data/sharing_repository.dart';
 import 'package:life360/models/models.dart';
+
+import 'gated_test_doubles.dart';
 
 // Checks reading and aggregating. Security rules aren't enforced by the fake:
 // see firestore.rules for who may read.
@@ -164,6 +168,192 @@ void main() {
     expect(day.steps, 4000);
     expect(day.sleepMinutes, 0); // private by default: never published
   });
+
+  group('leaderboard summaries run concurrently', () {
+    late _ReadLogDb logDb;
+
+    FirestoreStatsRepository gatedRepo(
+      GatedFriendsRepository gatedFriends,
+      GatedStatsRepository gatedOwn, {
+      PublishedSharingRepository? published,
+    }) => FirestoreStatsRepository(
+      logDb,
+      own: gatedOwn,
+      friends: gatedFriends,
+      published: published,
+      clock: () => now,
+    );
+
+    setUp(() async {
+      logDb = _ReadLogDb();
+      for (final entry in {'u_alex': 2000, 'u_bree': 5000}.entries) {
+        await logDb.doc('users/${entry.key}/daily/2026-03-10').set({
+          'date': '2026-03-10',
+          'steps': entry.value,
+        });
+      }
+    });
+
+    test('start every lookup before any finishes and read friends while my '
+        'summary is still pending, skipping unknown ids and me', () async {
+      final friendsGate = Gate();
+      final ownGate = Gate();
+      final gatedFriends = GatedFriendsRepository(friendsGate);
+      final board =
+          gatedRepo(
+            gatedFriends,
+            GatedStatsRepository(ownGate, stepsByUser: {mockMe.id: 3000}),
+          ).leaderboard(
+            StatMetric.steps,
+            weekOf: now,
+            userIds: ['u_bree', 'nobody', 'u_alex', mockMe.id, 'u_bree'],
+          );
+
+      await pumpEventQueue();
+      // Duplicates are dropped, and every lookup is already in flight.
+      expect(gatedFriends.started, ['u_bree', 'nobody', 'u_alex', mockMe.id]);
+      expect(logDb.reads, 0);
+      // Lookups finish in reverse order.
+      await friendsGate.openReversed();
+
+      await pumpEventQueue();
+      // My summary is held, yet both friends' summaries were already read.
+      expect(logDb.reads, 2);
+      ownGate.open();
+
+      final entries = await board;
+      expect(entries.map((e) => e.user.id), ['u_bree', mockMe.id, 'u_alex']);
+      expect(entries.map((e) => e.value), [5000, 3000, 2000]);
+      expect(entries.map((e) => e.rank), [1, 2, 3]);
+    });
+
+    test('without userIds, me then friends are summarised together', () async {
+      final friendIds = [
+        for (final f in await GatedFriendsRepository(Gate()).friends()) f.id,
+      ];
+      // Friend k gets (k + 2) thousand steps and me 1,000, so everyone has a
+      // different XP and the order is the friends reversed, then me.
+      final steps = {
+        mockMe.id: 1000,
+        for (var i = 0; i < friendIds.length; i++) friendIds[i]: (i + 2) * 1000,
+      };
+      for (final id in friendIds) {
+        await logDb.doc('users/$id/daily/2026-03-10').set({
+          'date': '2026-03-10',
+          'steps': steps[id],
+        });
+      }
+      final ownGate = Gate();
+      final board = gatedRepo(
+        GatedFriendsRepository(Gate()),
+        GatedStatsRepository(ownGate, stepsByUser: steps),
+      ).xpLeaderboard(weekOf: now);
+
+      await pumpEventQueue();
+      // Every friend is read while my summary is still pending.
+      expect(logDb.reads, friendIds.length);
+      await ownGate.openReversed();
+
+      final entries = await board;
+      final expectedIds = [...friendIds.reversed, mockMe.id];
+      expect(entries.map((e) => e.user.id), expectedIds);
+      expect(entries.map((e) => e.rank), [
+        for (var i = 1; i <= expectedIds.length; i++) i,
+      ]);
+      expect(entries.map((e) => e.value), [
+        for (final id in expectedIds)
+          dailyXp(
+            DailyStats(userId: id, date: DateTime(2026), steps: steps[id]!),
+          ),
+      ]);
+    });
+
+    test('friends looked up at the same time are each learned', () async {
+      final published = PublishedSharingRepository(
+        MockSharingRepository(initial: {}),
+      );
+      addTearDown(published.dispose);
+      final r = gatedRepo(
+        GatedFriendsRepository(Gate()..open()),
+        GatedStatsRepository(Gate()..open()),
+        published: published,
+      );
+      await logDb.doc('users/u_alex/daily/2026-03-10').set({
+        'date': '2026-03-10',
+        'steps': 2000,
+        'sleep': 400,
+      });
+
+      await r.leaderboard(
+        StatMetric.steps,
+        weekOf: now,
+        userIds: ['u_alex', 'u_bree'],
+      );
+
+      expect(
+        published.settingsFor('u_alex').isShared(StatMetric.sleep, now),
+        isTrue,
+      );
+      expect(
+        published.settingsFor('u_bree').isShared(StatMetric.sleep, now),
+        isFalse,
+      );
+      expect(
+        published.settingsFor('u_bree').isShared(StatMetric.steps, now),
+        isTrue,
+      );
+    });
+
+    test('a failing user lookup surfaces its error', () async {
+      final r = gatedRepo(
+        GatedFriendsRepository(Gate()..open(), failIds: {'u_alex'}),
+        GatedStatsRepository(Gate()..open()),
+      );
+      await expectLater(
+        r.leaderboard(
+          StatMetric.steps,
+          weekOf: now,
+          userIds: ['u_bree', 'u_alex'],
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'userById u_alex',
+          ),
+        ),
+      );
+    });
+
+    test('a failing weekly summary surfaces its error', () async {
+      final r = gatedRepo(
+        GatedFriendsRepository(Gate()..open()),
+        GatedStatsRepository(Gate()..open(), failIds: {mockMe.id}),
+      );
+      await expectLater(
+        r.leaderboard(StatMetric.steps, weekOf: now),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'weeklySummary ${mockMe.id}',
+          ),
+        ),
+      );
+    });
+  });
+}
+
+/// Counts reads of the `users` collection. Each friend's days are one read
+/// (the current user's come from `own`).
+class _ReadLogDb extends FakeFirebaseFirestore {
+  int reads = 0;
+
+  @override
+  CollectionReference<Map<String, dynamic>> collection(String path) {
+    if (path == 'users') reads++;
+    return super.collection(path);
+  }
 }
 
 class _DeniedDb extends FakeFirebaseFirestore {

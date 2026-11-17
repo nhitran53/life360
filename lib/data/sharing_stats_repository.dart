@@ -138,21 +138,27 @@ class SharingStatsRepository implements ConnectableStatsRepository {
   Future<List<UserProfile>> _people(Iterable<String>? userIds) async {
     final me = await friends.currentUser();
     if (userIds == null) return [me, ...await friends.friends()];
-    final others = <UserProfile>[];
-    for (final id in userIds.toSet()) {
-      final user = await friends.userById(id);
-      if (user != null && user.id != me.id) others.add(user);
-    }
-    return [me, ...others];
+    final found = await Future.wait([
+      for (final id in userIds.toSet()) friends.userById(id),
+    ]);
+    return [
+      me,
+      for (final user in found)
+        if (user != null && user.id != me.id) user,
+    ];
   }
 
   /// Unmasked summaries: ranking needs the real value of the shared metric.
   Future<Map<UserProfile, WeeklySummary>> _summaries(
     Iterable<UserProfile> people,
     DateTime? weekOf,
-  ) async => {
-    for (final p in people) p: await inner.weeklySummary(p.id, weekOf: weekOf),
-  };
+  ) async {
+    final list = people.toList();
+    final summaries = await Future.wait([
+      for (final p in list) inner.weeklySummary(p.id, weekOf: weekOf),
+    ]);
+    return {for (var i = 0; i < list.length; i++) list[i]: summaries[i]};
+  }
 }
 
 /// [d] with every metric in [hidden] set to 0.
