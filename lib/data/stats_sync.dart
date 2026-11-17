@@ -18,6 +18,8 @@ import 'sharing_repository.dart';
 ///   ([SharingRepository.isLoaded]), so the private defaults are never
 ///   mistaken for the user's choice, and [source] is connected to a real
 ///   health platform, so demo data is never published as the user's own.
+///   While health isn't connected, only the user's own screen time (see
+///   [ownScreenTime]) is published, and every other metric is left out.
 ///
 /// Taking data down is not allowed to fail silently. Until a revoke has
 /// succeeded for the current settings, [revocationPending] is true and a
@@ -33,6 +35,7 @@ class StatsSync {
     required this.sharing,
     required this.publisher,
     required this.userId,
+    this.ownScreenTime,
     DateTime Function()? clock,
     this.retryBase = const Duration(seconds: 5),
   }) : _clock = clock ?? DateTime.now;
@@ -42,6 +45,12 @@ class StatsSync {
   final SharingRepository sharing;
   final FirestoreStatsPublisher publisher;
   final String userId;
+
+  /// The user's real screen time (logged by hand or measured by the phone),
+  /// as days holding nothing else. Published while [source] isn't connected,
+  /// so people without health still share it. Null: publish nothing then.
+  final Future<List<DailyStats>> Function(DateTime from, DateTime to)?
+  ownScreenTime;
   final DateTime Function() _clock;
 
   /// The first retry delay of a failed revoke; it doubles each failure up to
@@ -127,23 +136,30 @@ class StatsSync {
         _failures = 0;
         _retryTimer?.cancel();
       }
-      if (settings.isPaused(_clock()) || !source.isConnected) return;
+      if (settings.isPaused(_clock())) return;
+      final connected = source.isConnected;
+      final screenTimeOnly = ownScreenTime;
+      if (!connected && screenTimeOnly == null) return;
       final today = dateOnly(_clock());
-      final days = await source.dailyStats(
-        userId,
-        from: DateTime(
-          today.year,
-          today.month,
-          today.day - (FirestoreStatsPublisher.windowDays - 1),
-        ),
-        to: today,
+      final from = DateTime(
+        today.year,
+        today.month,
+        today.day - (FirestoreStatsPublisher.windowDays - 1),
       );
+      final days = connected
+          ? await source.dailyStats(userId, from: from, to: today)
+          : await screenTimeOnly!(from, today);
       // Read after the (slow) fetch so a change made meanwhile is honoured.
       if (_disposed || !sharing.isLoaded) return;
       await publisher.publish(
         days,
         sharing.settingsFor(userId),
-        unavailable: source.deniedMetrics,
+        unavailable: connected
+            ? source.deniedMetrics
+            : {
+                for (final m in StatMetric.values)
+                  if (m != StatMetric.screenTime) m,
+              },
       );
     } on Object {
       // Deliberately silent: see the class comment.

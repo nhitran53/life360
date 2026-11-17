@@ -82,6 +82,30 @@ class ManualScreenTimeRepository implements ConnectableStatsRepository {
     return byDate.values.toList()..sort((a, b) => a.date.compareTo(b.date));
   }
 
+  /// Only the current user's real screen time (measured by this phone or
+  /// logged by hand, a logged day winning), as days that carry nothing else.
+  /// Never touches the inner source, so demo or fallback data can't leak in;
+  /// this is what to publish while health isn't connected.
+  Future<List<DailyStats>> ownScreenTimeDays({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final userId = (await _friends.currentUser()).id;
+    final measured = await device.hasAccess()
+        ? await device.dailyMinutes(from: from, to: to)
+        : const <DateTime, int>{};
+    final logged = await log.entries(from: from, to: to);
+    final byDate = {...measured, ...logged};
+    return [
+      for (final date in byDate.keys.toList()..sort())
+        DailyStats(
+          userId: userId,
+          date: date,
+          screenTimeMinutes: byDate[date]!,
+        ),
+    ];
+  }
+
   @override
   Future<WeeklySummary> weeklySummary(String userId, {DateTime? weekOf}) async {
     if (userId != (await _friends.currentUser()).id) {
