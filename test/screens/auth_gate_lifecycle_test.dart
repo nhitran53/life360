@@ -10,6 +10,7 @@ import 'package:life360/data/sharing_repository.dart';
 import 'package:life360/models/models.dart';
 import 'package:life360/screens/auth_gate.dart';
 import 'package:life360/screens/circle_screen.dart';
+import 'package:life360/screens/privacy_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Settings that never load, so StatsSync keeps retrying; counts the retries.
@@ -18,6 +19,8 @@ class _NeverLoadedSharing extends ChangeNotifier implements SharingRepository {
 
   bool get listened => hasListeners;
 
+  var settingsReads = 0;
+
   @override
   bool get isLoaded => false;
 
@@ -25,7 +28,10 @@ class _NeverLoadedSharing extends ChangeNotifier implements SharingRepository {
   Future<void> refresh() async => refreshes++;
 
   @override
-  SharingSettings settingsFor(String userId) => const SharingSettings();
+  SharingSettings settingsFor(String userId) {
+    settingsReads++;
+    return const SharingSettings();
+  }
 
   @override
   Future<void> update(String userId, SharingSettings settings) async {}
@@ -166,7 +172,79 @@ void main() {
     expect(made.last.isDisposed, isFalse);
   });
 
+  testOnLinux('signing out and back in before a frame rebuilds the screen', (
+    tester,
+  ) async {
+    await signIn(tester);
+    addTearDown(() {
+      session.dispose();
+      auth.dispose();
+    });
+    expect(find.byType(PrivacyScreen, skipOffstage: false), findsOneWidget);
+    final first = sharings.single;
+    expect(first.settingsReads, greaterThan(0));
+
+    // Out and in as the same user without a frame in between.
+    await session.signOut();
+    await auth.signInWithEmail('nhi@example.com', 'password1');
+    await tester.idle();
+    await tester.pump();
+
+    expect(made, hasLength(2));
+    expect(made.first.isDisposed, isTrue);
+    expect(sharings, hasLength(2));
+    final readsBefore = first.settingsReads;
+    expect(sharings.last.settingsReads, greaterThan(0));
+    // Rebuilds only ever read from the new sharing repository.
+    tester
+        .element(find.byType(PrivacyScreen, skipOffstage: false))
+        .markNeedsBuild();
+    await tester.pump();
+    expect(first.settingsReads, readsBefore);
+    final privacy = tester.widget<PrivacyScreen>(
+      find.byType(PrivacyScreen, skipOffstage: false),
+    );
+    expect(privacy.sharing, same(made.last.sharing));
+  });
+
   group('CircleScreen', () {
+    testOnLinux('swaps between made and passed-in services', (tester) async {
+      final own = <AppServices>[];
+      final passed = AppServices.defaults();
+      addTearDown(passed.dispose);
+      Widget screen(AppServices? services) => MaterialApp(
+        home: CircleScreen(
+          services: services,
+          createServices: () {
+            final made = AppServices.defaults();
+            own.add(made);
+            return made;
+          },
+        ),
+      );
+
+      await tester.pumpWidget(screen(null));
+      await tester.pump();
+      expect(own, hasLength(1));
+
+      await tester.pumpWidget(screen(passed));
+      await tester.pump();
+      expect(own.single.isDisposed, isTrue);
+      expect(passed.isDisposed, isFalse);
+
+      await tester.pumpWidget(screen(null));
+      await tester.pump();
+      // Open Ranks to use the services again: a fresh set, not the old one.
+      await tester.tap(find.text('Ranks'));
+      await tester.pumpAndSettle();
+      expect(own, hasLength(2));
+      expect(own.last.isDisposed, isFalse);
+
+      await tester.pumpWidget(const SizedBox());
+      expect(own.last.isDisposed, isTrue);
+      expect(passed.isDisposed, isFalse);
+    });
+
     testOnLinux('disposes the services it made itself', (tester) async {
       final own = <AppServices>[];
       await tester.pumpWidget(

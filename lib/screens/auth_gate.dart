@@ -124,7 +124,13 @@ class _AuthGateState extends State<AuthGate> {
       AccountStatus.needsProfile => const OnboardingScreen(),
       AccountStatus.loadFailed => _LoadFailedScreen(session: session),
       AccountStatus.ready =>
-        widget.signedIn?.call(context) ?? CircleScreen(services: _services!),
+        widget.signedIn?.call(context) ??
+            // Keyed by the services so a replacement rebuilds the whole
+            // subtree; descendants cache repositories from their services.
+            CircleScreen(
+              key: ObjectKey(_services),
+              services: _services!,
+            ),
     };
   }
 }

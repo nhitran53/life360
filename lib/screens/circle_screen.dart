@@ -175,6 +175,17 @@ class _CircleScreenState extends State<CircleScreen> {
   }
 
   @override
+  void didUpdateWidget(CircleScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Passed-in services replace the ones we made; release ours. Going back
+    // to null makes fresh ones on next use, never reusing the disposed set.
+    if (widget.services != null) {
+      _ownServices?.dispose();
+      _ownServices = null;
+    }
+  }
+
+  @override
   void dispose() {
     _ownServices?.dispose();
     super.dispose();
