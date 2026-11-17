@@ -24,8 +24,8 @@ class FirestoreFriendsRepository implements FriendsRepository {
   /// Most results a username search returns.
   static const searchLimit = 20;
 
-  /// Highest private-use code point; appended to a prefix it bounds every
-  /// string that starts with that prefix.
+  /// Upper-bound sentinel above every allowed username character; appended to
+  /// a prefix it bounds all usernames that start with that prefix.
   static const _prefixUpperBound = '\uf8ff';
 
   CollectionReference<Map<String, dynamic>> get _friendships =>
