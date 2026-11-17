@@ -224,6 +224,25 @@ void main() {
       expect(week.daysTracked, 2);
     });
 
+    test('weekly summary without weekOf uses the injected clock', () async {
+      final source = FakeHealthSource(
+        stats: [
+          day(9, steps: 2000), // week of the injected clock
+          day(11, steps: 4000),
+        ],
+      );
+      final r = HealthStatsRepository(
+        source: source,
+        fallback: mock,
+        friends: friends,
+        clock: () => today,
+      );
+      await r.connect();
+      final week = await r.weeklySummary(me);
+      expect(week.weekStart, DateTime(2026, 3, 9));
+      expect(week.total(StatMetric.steps), 6000);
+    });
+
     test(
       'leaderboard ranks the health-backed user among mock friends',
       () async {
