@@ -98,6 +98,20 @@ void main() {
       expect(days.first.steps, 0);
     });
 
+    test(
+      'ownScreenTimeDays has only screen time, with no fallback data',
+      () async {
+        // Not connected: dailyStats would fall back to mock data.
+        expect(await repo.ownScreenTimeDays(from: today, to: today), isEmpty);
+
+        await log.setMinutes(today, 95);
+        final days = await repo.ownScreenTimeDays(from: today, to: today);
+        expect(days, [
+          DailyStats(userId: mockMe.id, date: today, screenTimeMinutes: 95),
+        ]);
+      },
+    );
+
     test("friends' stats are untouched", () async {
       await log.setMinutes(today, 10);
       final friend = (await friends.friends()).first;

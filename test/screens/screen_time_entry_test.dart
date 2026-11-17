@@ -48,6 +48,7 @@ void main() {
     WidgetTester tester, {
     ScreenTimeLog? screenTimeLog,
     DeviceScreenTime? deviceScreenTime,
+    Future<void> Function()? onScreenTimeSaved,
   }) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
@@ -60,6 +61,7 @@ void main() {
           stats: stats,
           clock: clock,
           screenTimeLog: screenTimeLog,
+          onScreenTimeSaved: onScreenTimeSaved,
           deviceScreenTime: deviceScreenTime ?? const NoDeviceScreenTime(),
         ),
       ),
@@ -113,9 +115,7 @@ void main() {
       expect(device.settingsOpened, 1);
     });
 
-    testWidgets('picks up screen time after access is granted', (
-      tester,
-    ) async {
+    testWidgets('picks up screen time after access is granted', (tester) async {
       await pumpWithDevice(tester);
       expect(inScreenTimeCard('Not tracked yet today'), findsOneWidget);
 
@@ -183,6 +183,36 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Edit screen time'), findsOneWidget);
+  });
+
+  testWidgets('Saving screen time triggers exactly one sync', (tester) async {
+    var syncs = 0;
+    await pumpScreen(
+      tester,
+      screenTimeLog: log,
+      onScreenTimeSaved: () async => syncs++,
+    );
+    await connect(tester);
+    await tapVisible(tester, find.byKey(const ValueKey('log-screen-time')));
+    expect(syncs, 0);
+    await tester.tap(find.byKey(const ValueKey('screen-time-save')));
+    await tester.pumpAndSettle();
+    expect(syncs, 1);
+  });
+
+  testWidgets('A failing sync never breaks the save', (tester) async {
+    await pumpScreen(
+      tester,
+      screenTimeLog: log,
+      onScreenTimeSaved: () async => throw StateError('offline'),
+    );
+    await connect(tester);
+    await tapVisible(tester, find.byKey(const ValueKey('log-screen-time')));
+    await tester.tap(find.byKey(const ValueKey('screen-time-save')));
+    await tester.pumpAndSettle();
+    expect(await log.entries(from: today, to: today), {today: 120});
+    expect(find.text('Screen time logged 📱'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Editing starts from the logged value and can clear it', (

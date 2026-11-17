@@ -43,12 +43,13 @@ class AppServices {
   }) : circles = circles ?? MockCircleRepository(),
        sharing = sharing ?? MockSharingRepository(),
        screenTime = screenTime ?? InMemoryScreenTimeLog() {
-    rawStats = ManualScreenTimeRepository(
+    _manualStats = ManualScreenTimeRepository(
       inner: stats,
       friends: friends,
       log: this.screenTime,
       device: deviceScreenTime,
     );
+    rawStats = _manualStats;
     this.stats = SharingStatsRepository(
       inner: rawStats,
       friends: friends,
@@ -123,6 +124,8 @@ class AppServices {
         sharing: sharing,
         publisher: FirestoreStatsPublisher(statsDb, uid: userId),
         userId: userId,
+        ownScreenTime: (from, to) =>
+            services._manualStats.ownScreenTimeDays(from: from, to: to),
       )..start();
     }
     // Reconnect in the background so other screens see health stats too;
@@ -131,7 +134,12 @@ class AppServices {
     return services;
   }
 
+  late final ManualScreenTimeRepository _manualStats;
   StatsSync? _sync;
+
+  /// Publishes the user's stats now (e.g. after logging screen time). Does
+  /// nothing when stats aren't published. Never throws.
+  Future<void> syncNow() async => _sync?.sync();
 
   /// Stops publishing stats. Call when the user signs out.
   void dispose() => _sync?.dispose();

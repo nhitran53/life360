@@ -128,6 +128,7 @@ class _CircleScreenState extends State<CircleScreen> {
           friends: _services.friends,
           stats: _services.stats,
           screenTimeLog: _services.screenTime,
+          onScreenTimeSaved: _services.syncNow,
           // Your own goals once you're signed in.
           goals: AccountScope.maybeOf(context)?.goals ?? const DailyGoals(),
         ),
