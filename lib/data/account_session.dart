@@ -169,6 +169,14 @@ class AccountSession extends ChangeNotifier {
   ///
   /// Checks for a recent sign-in first, so a refused delete can't leave an
   /// account whose data is already gone.
+  ///
+  /// The data goes first because the security rules need the user signed
+  /// in to delete it. If either step still fails (offline, or the server
+  /// disagrees about the recent sign-in), the profile is loaded again
+  /// before the error is rethrown, so the session never keeps showing a
+  /// profile that no longer exists: it drops to
+  /// [AccountStatus.needsProfile] if the data is gone, or
+  /// [AccountStatus.loadFailed] if it can't tell.
   Future<void> deleteAccount() async {
     final user = _user;
     if (user == null) return;
@@ -178,8 +186,15 @@ class AccountSession extends ChangeNotifier {
         'For safety, log out and back in, then try again.',
       );
     }
-    await profiles.deleteProfile(user.uid);
-    await auth.deleteAccount();
+    try {
+      await profiles.deleteProfile(user.uid);
+      await auth.deleteAccount();
+    } on Exception catch (e) {
+      // Only the kind of failure: the details could identify the user.
+      debugPrint('Deleting the account failed: ${e.runtimeType}');
+      if (!_disposed && _user?.uid == user.uid) await _onAuthChanged(_user);
+      rethrow;
+    }
   }
 
   @override
