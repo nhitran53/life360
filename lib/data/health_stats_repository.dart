@@ -196,18 +196,22 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     Iterable<String>? userIds,
   ) async {
     final me = await _friends.currentUser();
-    final others = <UserProfile>[];
+    final List<UserProfile> others;
     if (userIds == null) {
-      others.addAll(await _friends.friends());
+      others = await _friends.friends();
     } else {
-      for (final id in userIds.toSet()) {
-        final user = await _friends.userById(id);
-        if (user != null && user.id != me.id) others.add(user);
-      }
+      final found = await Future.wait([
+        for (final id in userIds.toSet()) _friends.userById(id),
+      ]);
+      others = [
+        for (final user in found)
+          if (user != null && user.id != me.id) user,
+      ];
     }
-    return {
-      for (final p in [me, ...others])
-        p: await weeklySummary(p.id, weekOf: weekOf),
-    };
+    final people = [me, ...others];
+    final summaries = await Future.wait([
+      for (final p in people) weeklySummary(p.id, weekOf: weekOf),
+    ]);
+    return {for (var i = 0; i < people.length; i++) people[i]: summaries[i]};
   }
 }
