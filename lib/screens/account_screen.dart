@@ -21,8 +21,23 @@ class _AccountScreenState extends State<AccountScreen> {
   bool _busy = false;
 
   Future<void> _signOut() async {
+    final session = AccountScope.of(context);
     setState(() => _busy = true);
-    await AccountScope.of(context).signOut();
+    try {
+      await session.signOut();
+    } on Exception catch (e) {
+      debugPrint('Signing out failed: ${e.runtimeType}');
+      _showError("Couldn't log you out. Check your connection and try again.");
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _delete() async {
@@ -54,17 +69,19 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       await session.deleteAccount();
     } on AuthException catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.code == AuthException.requiresRecentLogin
-                ? 'For safety, log out and back in, then try again.'
-                : e.message,
-          ),
-        ),
+      _showError(
+        e.code == AuthException.requiresRecentLogin
+            ? 'For safety, log out and back in, then try again.'
+            : e.message,
       );
+    } on Exception catch (e) {
+      // e.g. a FirebaseException from deleting the profile while offline.
+      debugPrint('Deleting the account failed: ${e.runtimeType}');
+      _showError(
+        "Couldn't delete your account. Check your connection and try again.",
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 

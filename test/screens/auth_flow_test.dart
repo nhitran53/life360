@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:life360/data/account_session.dart';
@@ -29,6 +30,27 @@ class _OfflineProfiles extends MockProfileRepository {
   @override
   Future<UserProfile?> profileFor(String uid) =>
       failing ? Future.error(Exception('unavailable')) : super.profileFor(uid);
+}
+
+/// Username checks and profile deletes fail like an offline Firestore
+/// would, while the flags are on.
+class _FlakyProfiles extends MockProfileRepository {
+  var failChecks = false;
+  var failDeletes = false;
+
+  static final _offline = FirebaseException(
+    plugin: 'cloud_firestore',
+    code: 'unavailable',
+  );
+
+  @override
+  Future<bool> isUsernameAvailable(String username) => failChecks
+      ? Future.error(_offline)
+      : super.isUsernameAvailable(username);
+
+  @override
+  Future<void> deleteProfile(String uid) =>
+      failDeletes ? Future.error(_offline) : super.deleteProfile(uid);
 }
 
 void main() {
@@ -165,7 +187,10 @@ void main() {
     await signUp(tester);
 
     await tester.enterText(find.byKey(const ValueKey('name-field')), 'Nhi');
-    await tester.enterText(find.byKey(const ValueKey('username-field')), 'nhi');
+    await tester.enterText(
+      find.byKey(const ValueKey('username-field')),
+      'nhi',
+    );
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Continue'));
@@ -350,5 +375,82 @@ void main() {
 
     expect(find.text('I already have an account'), findsOneWidget);
     expect(await profiles.isUsernameAvailable('nhi'), isTrue);
+  });
+
+  /// Like [makeSession], with profiles whose network calls can fail.
+  _FlakyProfiles makeFlakySession() {
+    auth = MockAuthRepository();
+    final flaky = _FlakyProfiles();
+    profiles = flaky;
+    session = AccountSession(auth: auth, profiles: profiles);
+    addTearDown(() {
+      session.dispose();
+      auth.dispose();
+    });
+    return flaky;
+  }
+
+  testWidgets('An offline username check stops spinning and says so', (
+    tester,
+  ) async {
+    final flaky = makeFlakySession();
+    await startApp(tester);
+    await signUp(tester);
+
+    flaky.failChecks = true;
+    await tester.enterText(find.byKey(const ValueKey('name-field')), 'Nhi');
+    await tester.enterText(
+      find.byKey(const ValueKey('username-field')),
+      'nhi',
+    );
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        "Couldn't check that username. Check your connection and try again.",
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('One sec…'), findsNothing);
+
+    flaky.failChecks = false;
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pick your look'), findsOneWidget);
+  });
+
+  testWidgets('An offline account delete frees the screen and says so', (
+    tester,
+  ) async {
+    final flaky = makeFlakySession();
+    await startApp(tester);
+    await signUp(tester);
+    await onboard(tester);
+
+    await tester.tap(find.text('Privacy'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Account'));
+    await tester.tap(find.text('Account'));
+    await tester.pumpAndSettle();
+
+    flaky.failDeletes = true;
+    await tester.tap(find.text('Delete account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        "Couldn't delete your account. Check your connection and try again.",
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(AccountScreen), findsOneWidget);
+
+    // Not stuck: logging out still works.
+    await tester.tap(find.text('Log out'));
+    await tester.pumpAndSettle();
+    expect(find.text('I already have an account'), findsOneWidget);
   });
 }

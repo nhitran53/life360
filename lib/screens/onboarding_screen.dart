@@ -90,18 +90,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
     if (nameError != null || usernameError != null) return;
 
-    setState(() => _busy = true);
-    final session = AccountScope.of(context);
-    final free = await session.profiles.isUsernameAvailable(username);
-    if (!mounted) return;
     setState(() {
-      _busy = false;
-      if (free) {
-        _step = _Step.avatar;
-      } else {
-        _usernameError = '@$username is taken. Try another one.';
-      }
+      _busy = true;
+      _error = null;
     });
+    final session = AccountScope.of(context);
+    try {
+      final free = await session.profiles.isUsernameAvailable(username);
+      if (!mounted) return;
+      setState(() {
+        if (free) {
+          _step = _Step.avatar;
+        } else {
+          _usernameError = '@$username is taken. Try another one.';
+        }
+      });
+    } on Exception catch (e) {
+      // Offline, timeout or permission denied: say so instead of spinning.
+      debugPrint('Checking the username failed: ${e.runtimeType}');
+      if (!mounted) return;
+      setState(
+        () => _error =
+            "Couldn't check that username. Check your connection and try "
+            'again.',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _finish() async {
