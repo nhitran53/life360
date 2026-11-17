@@ -24,6 +24,10 @@ class FirestoreFriendsRepository implements FriendsRepository {
   /// Most results a username search returns.
   static const searchLimit = 20;
 
+  /// Highest private-use code point; appended to a prefix it bounds every
+  /// string that starts with that prefix.
+  static const _prefixUpperBound = '\uf8ff';
+
   CollectionReference<Map<String, dynamic>> get _friendships =>
       _db.collection('friendships');
   CollectionReference<Map<String, dynamic>> get _users =>
@@ -95,7 +99,7 @@ class FirestoreFriendsRepository implements FriendsRepository {
     if (q.length < 2) return const [];
     final snap = await _users
         .where('username', isGreaterThanOrEqualTo: q)
-        .where('username', isLessThan: '$q')
+        .where('username', isLessThan: '$q$_prefixUpperBound')
         .limit(searchLimit + 1) // +1 in case one of them is you
         .get();
     return snap.docs

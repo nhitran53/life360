@@ -163,7 +163,7 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     if (!await _usesHealth(userId)) {
       return _fallback.weeklySummary(userId, weekOf: weekOf);
     }
-    final weekStart = startOfWeek(weekOf ?? DateTime.now());
+    final weekStart = startOfWeek(weekOf ?? _clock());
     final days = await _source.fetchDailyStats(
       userId,
       from: weekStart,
