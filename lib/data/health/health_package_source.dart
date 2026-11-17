@@ -22,6 +22,10 @@ class HealthPackageSource implements HealthSource {
   final Health _health;
   bool _configured = false;
 
+  /// Most days whose platform queries are in flight at once in
+  /// [fetchDailyStats] (each day makes up to two calls).
+  static const maxConcurrentDays = 8;
+
   static const _sleepStageTypes = [
     HealthDataType.SLEEP_ASLEEP,
     HealthDataType.SLEEP_LIGHT,
@@ -144,8 +148,10 @@ class HealthPackageSource implements HealthSource {
       );
     }
 
-    // Days are independent platform queries, so they run concurrently;
-    // Future.wait keeps date order and rethrows the first failure.
+    // Days are independent platform queries, so a bounded number run at once
+    // (a long range would otherwise flood the platform channel). Results are
+    // stored by index, so the output stays in date order; the first failure
+    // is rethrown as is.
     final days = <DateTime>[
       for (
         var day = first;
@@ -154,11 +160,34 @@ class HealthPackageSource implements HealthSource {
       )
         day,
     ];
-    final stats = await Future.wait([
-      for (final day in days)
-        _dayStats(userId, day, readable: readable, intervals: intervals),
+    final stats = List<DailyStats?>.filled(days.length, null);
+    var nextIndex = 0;
+    var failed = false;
+    Future<void> worker() async {
+      // After a failure the other workers stop starting new days.
+      while (!failed && nextIndex < days.length) {
+        final index = nextIndex++;
+        try {
+          stats[index] = await _dayStats(
+            userId,
+            days[index],
+            readable: readable,
+            intervals: intervals,
+          );
+        } on Object {
+          failed = true;
+          rethrow;
+        }
+      }
+    }
+
+    await Future.wait([
+      for (var i = 0; i < maxConcurrentDays && i < days.length; i++) worker(),
     ]);
-    return stats.where(_hasData).toList();
+    return [
+      for (final day in stats)
+        if (_hasData(day!)) day,
+    ];
   }
 
   Future<DailyStats> _dayStats(

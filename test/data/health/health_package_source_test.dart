@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health/health.dart';
@@ -17,6 +18,20 @@ class _FakeHealth extends Fake implements Health {
 
   final stepCalls = <DateTime>[];
   final calorieCalls = <DateTime>[];
+
+  /// Platform calls started but not yet finished, and the most there ever
+  /// were at once.
+  int inFlight = 0;
+  int maxInFlight = 0;
+
+  Future<T> _tracked<T>(Future<T> Function() call) async {
+    maxInFlight = max(maxInFlight, ++inFlight);
+    try {
+      return await call();
+    } finally {
+      inFlight--;
+    }
+  }
 
   @override
   Future<void> configure() async {}
@@ -39,7 +54,7 @@ class _FakeHealth extends Fake implements Health {
     bool includeManualEntry = true,
   }) {
     stepCalls.add(startTime);
-    return steps(startTime);
+    return _tracked(() => steps(startTime));
   }
 
   @override
@@ -51,7 +66,7 @@ class _FakeHealth extends Fake implements Health {
     List<RecordingMethod> recordingMethodsToFilter = const [],
   }) async {
     calorieCalls.add(startDate);
-    final kcal = await calories(startDate);
+    final kcal = await _tracked(() => calories(startDate));
     return [
       HealthDataPoint(
         uuid: 'u${startDate.day}',
@@ -132,6 +147,85 @@ void main() {
       expect(days.map((d) => d.date.day), [9, 10, 11, 12, 13]);
       expect(days.map((d) => d.steps), [90, 100, 110, 120, 130]);
       expect(days.map((d) => d.activeCalories), [9, 10, 11, 12, 13]);
+    });
+
+    test(
+      'returns days oldest first when calls finish in reverse order',
+      () async {
+        final steps = {for (var d = 9; d <= 13; d++) d: Completer<int?>()};
+        final calories = {for (var d = 9; d <= 13; d++) d: Completer<double>()};
+        final health = _FakeHealth(
+          steps: (d) => steps[d.day]!.future,
+          calories: (d) => calories[d.day]!.future,
+        );
+        final result = HealthPackageSource(health: health)
+            .fetchDailyStats('me', from: from, to: to);
+
+        await pumpEventQueue();
+        // Newest day finishes first, oldest last.
+        for (var d = 13; d >= 9; d--) {
+          steps[d]!.complete(d * 10);
+          calories[d]!.complete(d.toDouble());
+          await pumpEventQueue();
+        }
+
+        final days = await result;
+        expect(days.map((d) => d.date.day), [9, 10, 11, 12, 13]);
+        expect(days.map((d) => d.steps), [90, 100, 110, 120, 130]);
+        expect(days.map((d) => d.activeCalories), [9, 10, 11, 12, 13]);
+      },
+    );
+
+    test(
+      'keeps at most maxConcurrentDays days in flight over a long range',
+      () async {
+        const dayCount = 61;
+        final health = _FakeHealth(
+          steps: (d) async {
+            await Future<void>.delayed(Duration.zero);
+            return d.difference(DateTime(2026)).inDays + 1;
+          },
+          calories: (d) async {
+            await Future<void>.delayed(Duration.zero);
+            return 5;
+          },
+        );
+        final days = await HealthPackageSource(health: health).fetchDailyStats(
+          'me',
+          from: DateTime(2026),
+          to: DateTime(2026, 1, dayCount),
+        );
+
+        // Each day makes two calls (steps and calories) at the same time.
+        expect(health.maxInFlight, HealthPackageSource.maxConcurrentDays * 2);
+        expect(health.inFlight, 0);
+        expect(days.length, dayCount);
+        expect(days.map((d) => d.date), [
+          for (var i = 1; i <= dayCount; i++) DateTime(2026, 1, i),
+        ]);
+        expect(days.map((d) => d.steps), [
+          for (var i = 1; i <= dayCount; i++) i,
+        ]);
+      },
+    );
+
+    test('stops starting new days after a failure', () async {
+      final health = _FakeHealth(
+        steps: (d) async => d.day == 1 ? throw StateError('steps 1') : 1,
+        calories: (d) async => 5,
+      );
+      await expectLater(
+        HealthPackageSource(health: health).fetchDailyStats(
+          'me',
+          from: DateTime(2026),
+          to: DateTime(2026, 1, 61),
+        ),
+        throwsA(
+          isA<StateError>().having((e) => e.message, 'message', 'steps 1'),
+        ),
+      );
+      await pumpEventQueue();
+      expect(health.stepCalls.length, lessThan(61));
     });
 
     test('a failing steps call throws its error and returns nothing', () async {

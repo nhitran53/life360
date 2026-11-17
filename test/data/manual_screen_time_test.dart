@@ -275,7 +275,10 @@ void main() {
       final friendsGate = Gate();
       final statsGate = Gate();
       final gatedFriends = GatedFriendsRepository(friendsGate);
-      final gatedStats = GatedStatsRepository(statsGate);
+      final gatedStats = GatedStatsRepository(
+        statsGate,
+        stepsByUser: {mockMe.id: 300, 'u_bree': 500, 'u_alex': 200},
+      );
       final board = gatedRepo(gatedFriends, gatedStats).leaderboard(
         StatMetric.steps,
         weekOf: now,
@@ -286,7 +289,8 @@ void main() {
       // Duplicates are dropped, and every lookup is already in flight.
       expect(gatedFriends.started, ['u_bree', 'nobody', 'u_alex', mockMe.id]);
       expect(gatedStats.started, isEmpty);
-      friendsGate.open();
+      // Lookups finish in reverse order.
+      await friendsGate.openReversed();
 
       await pumpEventQueue();
       // Me first, then the found users in the order given; all in flight.
@@ -297,32 +301,51 @@ void main() {
         'u_bree',
         'u_alex',
       ]);
-      statsGate.open();
+      // Summaries finish in reverse order but still land on the right people.
+      await statsGate.openReversed();
 
       final entries = await board;
-      expect(entries.map((e) => e.user.id).toSet(), {
-        mockMe.id,
-        'u_bree',
-        'u_alex',
-      });
+      expect(entries.map((e) => e.user.id), ['u_bree', mockMe.id, 'u_alex']);
+      expect(entries.map((e) => e.value), [500, 300, 200]);
+      expect(entries.map((e) => e.rank), [1, 2, 3]);
+      expect(entries.every((e) => e.metric == StatMetric.steps), isTrue);
     });
 
     test('without userIds, me then friends are summarised together', () async {
       final statsGate = Gate();
-      final gatedStats = GatedStatsRepository(statsGate);
+      final friendIds = [
+        for (final f in await GatedFriendsRepository(Gate()).friends()) f.id,
+      ];
+      // Friend k gets (k + 2) thousand steps and me 1,000, so everyone has a
+      // different XP and the order is the friends reversed, then me.
+      final steps = {
+        mockMe.id: 1000,
+        for (var i = 0; i < friendIds.length; i++) friendIds[i]: (i + 2) * 1000,
+      };
+      final gatedStats = GatedStatsRepository(statsGate, stepsByUser: steps);
       final board = gatedRepo(
         GatedFriendsRepository(Gate()),
         gatedStats,
       ).xpLeaderboard(weekOf: now);
 
       await pumpEventQueue();
-      final friendIds = [
-        for (final f in await GatedFriendsRepository(Gate()).friends()) f.id,
-      ];
       expect(gatedStats.started.toSet(), {mockMe.id, ...friendIds});
       expect(gatedStats.started.where((id) => id != mockMe.id), friendIds);
-      statsGate.open();
-      expect((await board).length, friendIds.length + 1);
+      await statsGate.openReversed();
+
+      final entries = await board;
+      final expectedIds = [...friendIds.reversed, mockMe.id];
+      expect(entries.map((e) => e.user.id), expectedIds);
+      expect(entries.map((e) => e.rank), [
+        for (var i = 1; i <= expectedIds.length; i++) i,
+      ]);
+      expect(entries.map((e) => e.value), [
+        for (final id in expectedIds)
+          dailyXp(
+            DailyStats(userId: id, date: DateTime(2026), steps: steps[id]!),
+          ),
+      ]);
+      expect(entries.every((e) => e.metric == null), isTrue);
     });
 
     test('a failing user lookup surfaces its error', () async {
