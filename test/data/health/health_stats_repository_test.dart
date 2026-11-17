@@ -4,7 +4,10 @@ import 'package:life360/data/health/health_source.dart';
 import 'package:life360/data/health_stats_repository.dart';
 import 'package:life360/data/mock_friends_repository.dart';
 import 'package:life360/data/mock_stats_repository.dart';
+import 'package:life360/data/mock_data.dart';
 import 'package:life360/models/models.dart';
+
+import '../gated_test_doubles.dart';
 
 void main() {
   final today = DateTime(2026, 3, 11); // Wednesday
@@ -235,7 +238,9 @@ void main() {
     );
 
     test('xp leaderboard ranks the health-backed user among friends', () async {
-      final source = FakeHealthSource(stats: [day(9, steps: 5000, workout: 10)]);
+      final source = FakeHealthSource(
+        stats: [day(9, steps: 5000, workout: 10)],
+      );
       final r = repo(source);
       await r.connect();
       final board = await r.xpLeaderboard(weekOf: today);
@@ -289,6 +294,105 @@ void main() {
       final source = FakeHealthSource();
       await repo(source).openInstallPage();
       expect(source.openInstallPageCalls, 1);
+    });
+  });
+
+  HealthStatsRepository gatedRepo(
+    GatedFriendsRepository gatedFriends,
+    GatedStatsRepository gatedStats,
+  ) => HealthStatsRepository(
+    source: FakeHealthSource(),
+    fallback: gatedStats,
+    friends: gatedFriends,
+    clock: () => today,
+  );
+
+  group('leaderboard summaries run concurrently', () {
+    test('start every lookup and summary before any finishes, me first, '
+        'skipping unknown ids and me', () async {
+      final friendsGate = Gate();
+      final statsGate = Gate();
+      final gatedFriends = GatedFriendsRepository(friendsGate);
+      final gatedStats = GatedStatsRepository(statsGate);
+      final board = gatedRepo(gatedFriends, gatedStats).leaderboard(
+        StatMetric.steps,
+        weekOf: today,
+        userIds: ['u_bree', 'nobody', 'u_alex', mockMe.id, 'u_bree'],
+      );
+
+      await pumpEventQueue();
+      // Duplicates are dropped, and every lookup is already in flight.
+      expect(gatedFriends.started, ['u_bree', 'nobody', 'u_alex', mockMe.id]);
+      expect(gatedStats.started, isEmpty);
+      friendsGate.open();
+
+      await pumpEventQueue();
+      // Me first, then the found users in the order given; all in flight.
+      expect(gatedStats.started, [mockMe.id, 'u_bree', 'u_alex']);
+      statsGate.open();
+
+      final entries = await board;
+      expect(entries.map((e) => e.user.id).toSet(), {
+        mockMe.id,
+        'u_bree',
+        'u_alex',
+      });
+    });
+
+    test('without userIds, me then friends are summarised together', () async {
+      final statsGate = Gate();
+      final gatedStats = GatedStatsRepository(statsGate);
+      final board = gatedRepo(
+        GatedFriendsRepository(Gate()),
+        gatedStats,
+      ).xpLeaderboard(weekOf: today);
+
+      await pumpEventQueue();
+      final friendIds = [
+        for (final f in await GatedFriendsRepository(Gate()).friends()) f.id,
+      ];
+      expect(gatedStats.started, [mockMe.id, ...friendIds]);
+      statsGate.open();
+      expect((await board).length, friendIds.length + 1);
+    });
+
+    test('a failing user lookup surfaces its error', () async {
+      final friendsGate = Gate()..open();
+      final r = gatedRepo(
+        GatedFriendsRepository(friendsGate, failIds: {'u_alex'}),
+        GatedStatsRepository(Gate()..open()),
+      );
+      await expectLater(
+        r.leaderboard(
+          StatMetric.steps,
+          weekOf: today,
+          userIds: ['u_bree', 'u_alex'],
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'userById u_alex',
+          ),
+        ),
+      );
+    });
+
+    test('a failing weekly summary surfaces its error', () async {
+      final r = gatedRepo(
+        GatedFriendsRepository(Gate()..open()),
+        GatedStatsRepository(Gate()..open(), failIds: {'u_bree'}),
+      );
+      await expectLater(
+        r.leaderboard(StatMetric.steps, weekOf: today),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'weeklySummary u_bree',
+          ),
+        ),
+      );
     });
   });
 }

@@ -10,6 +10,8 @@ import 'package:life360/data/mock_stats_repository.dart';
 import 'package:life360/data/screen_time_log.dart';
 import 'package:life360/models/models.dart';
 
+import 'gated_test_doubles.dart';
+
 void main() {
   // A Wednesday afternoon.
   final now = DateTime(2026, 11, 4, 15);
@@ -251,4 +253,115 @@ void main() {
       expect(day.screenTimeMinutes, 42);
     },
   );
+
+  ManualScreenTimeRepository gatedRepo(
+    GatedFriendsRepository gatedFriends,
+    GatedStatsRepository gatedStats,
+  ) => ManualScreenTimeRepository(
+    inner: HealthStatsRepository(
+      source: FakeHealthSource(),
+      fallback: gatedStats,
+      friends: gatedFriends,
+      clock: clock,
+    ),
+    friends: gatedFriends,
+    log: InMemoryScreenTimeLog(),
+    clock: clock,
+  );
+
+  group('leaderboard summaries run concurrently', () {
+    test('start every lookup and summary before any finishes, '
+        'skipping unknown ids and me', () async {
+      final friendsGate = Gate();
+      final statsGate = Gate();
+      final gatedFriends = GatedFriendsRepository(friendsGate);
+      final gatedStats = GatedStatsRepository(statsGate);
+      final board = gatedRepo(gatedFriends, gatedStats).leaderboard(
+        StatMetric.steps,
+        weekOf: now,
+        userIds: ['u_bree', 'nobody', 'u_alex', mockMe.id, 'u_bree'],
+      );
+
+      await pumpEventQueue();
+      // Duplicates are dropped, and every lookup is already in flight.
+      expect(gatedFriends.started, ['u_bree', 'nobody', 'u_alex', mockMe.id]);
+      expect(gatedStats.started, isEmpty);
+      friendsGate.open();
+
+      await pumpEventQueue();
+      // Me first, then the found users in the order given; all in flight.
+      // My summary is rebuilt from days, so it may start at a different
+      // moment; the others keep their order.
+      expect(gatedStats.started.toSet(), {mockMe.id, 'u_bree', 'u_alex'});
+      expect(gatedStats.started.where((id) => id != mockMe.id), [
+        'u_bree',
+        'u_alex',
+      ]);
+      statsGate.open();
+
+      final entries = await board;
+      expect(entries.map((e) => e.user.id).toSet(), {
+        mockMe.id,
+        'u_bree',
+        'u_alex',
+      });
+    });
+
+    test('without userIds, me then friends are summarised together', () async {
+      final statsGate = Gate();
+      final gatedStats = GatedStatsRepository(statsGate);
+      final board = gatedRepo(
+        GatedFriendsRepository(Gate()),
+        gatedStats,
+      ).xpLeaderboard(weekOf: now);
+
+      await pumpEventQueue();
+      final friendIds = [
+        for (final f in await GatedFriendsRepository(Gate()).friends()) f.id,
+      ];
+      expect(gatedStats.started.toSet(), {mockMe.id, ...friendIds});
+      expect(gatedStats.started.where((id) => id != mockMe.id), friendIds);
+      statsGate.open();
+      expect((await board).length, friendIds.length + 1);
+    });
+
+    test('a failing user lookup surfaces its error', () async {
+      final friendsGate = Gate()..open();
+      final r = gatedRepo(
+        GatedFriendsRepository(friendsGate, failIds: {'u_alex'}),
+        GatedStatsRepository(Gate()..open()),
+      );
+      await expectLater(
+        r.leaderboard(
+          StatMetric.steps,
+          weekOf: now,
+          userIds: ['u_bree', 'u_alex'],
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'userById u_alex',
+          ),
+        ),
+      );
+    });
+
+    test('a failing weekly summary surfaces its error', () async {
+      final r = gatedRepo(
+        GatedFriendsRepository(Gate()..open()),
+        GatedStatsRepository(Gate()..open(), failIds: {'u_bree'}),
+      );
+      await expectLater(
+        r.leaderboard(StatMetric.steps, weekOf: now),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'weeklySummary u_bree',
+          ),
+        ),
+      );
+    });
+  });
 }

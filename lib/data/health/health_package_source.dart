@@ -144,34 +144,52 @@ class HealthPackageSource implements HealthSource {
       );
     }
 
-    final result = <DailyStats>[];
-    for (
-      var day = first;
-      !day.isAfter(last);
-      day = DateTime(day.year, day.month, day.day + 1)
-    ) {
-      final next = DateTime(day.year, day.month, day.day + 1);
-      final stats = DailyStats(
-        userId: userId,
-        date: day,
-        // Platform aggregates merge overlapping sources (phone plus watch),
-        // so steps and calories are never summed from raw samples here.
-        steps: readable.contains(StatMetric.steps)
-            ? await _health.getTotalStepsInInterval(day, next) ?? 0
-            : 0,
-        activeCalories: readable.contains(StatMetric.calories)
-            ? await _activeCalories(day, next)
-            : 0,
-        sleepMinutes: readable.contains(StatMetric.sleep)
-            ? sleepMinutesForDay(intervals, day)
-            : 0,
-        workoutMinutes: readable.contains(StatMetric.workout)
-            ? workoutMinutesForDay(intervals, day)
-            : 0,
-      );
-      if (_hasData(stats)) result.add(stats);
-    }
-    return result;
+    // Days are independent platform queries, so they run concurrently;
+    // Future.wait keeps date order and rethrows the first failure.
+    final days = <DateTime>[
+      for (
+        var day = first;
+        !day.isAfter(last);
+        day = DateTime(day.year, day.month, day.day + 1)
+      )
+        day,
+    ];
+    final stats = await Future.wait([
+      for (final day in days)
+        _dayStats(userId, day, readable: readable, intervals: intervals),
+    ]);
+    return stats.where(_hasData).toList();
+  }
+
+  Future<DailyStats> _dayStats(
+    String userId,
+    DateTime day, {
+    required Set<StatMetric> readable,
+    required List<HealthInterval> intervals,
+  }) async {
+    final next = DateTime(day.year, day.month, day.day + 1);
+    // Platform aggregates merge overlapping sources (phone plus watch), so
+    // steps and calories are never summed from raw samples here.
+    final totals = await Future.wait([
+      readable.contains(StatMetric.steps)
+          ? _health.getTotalStepsInInterval(day, next).then((v) => v ?? 0)
+          : Future.value(0),
+      readable.contains(StatMetric.calories)
+          ? _activeCalories(day, next)
+          : Future.value(0),
+    ]);
+    return DailyStats(
+      userId: userId,
+      date: day,
+      steps: totals[0],
+      activeCalories: totals[1],
+      sleepMinutes: readable.contains(StatMetric.sleep)
+          ? sleepMinutesForDay(intervals, day)
+          : 0,
+      workoutMinutes: readable.contains(StatMetric.workout)
+          ? workoutMinutesForDay(intervals, day)
+          : 0,
+    );
   }
 
   bool _hasData(DailyStats s) =>
