@@ -25,6 +25,12 @@ class FakeHealthSource implements HealthSource {
 
   HealthAvailability availabilityResult;
 
+  /// When set, [availability] throws it.
+  Exception? availabilityError;
+
+  /// When set, [requestPermissions] and [checkPermissions] throw it.
+  Exception? permissionsError;
+
   /// What [requestPermissions] and [checkPermissions] report, and what
   /// [fetchDailyStats] honours.
   Map<StatMetric, HealthPermissionStatus> permissionOutcome;
@@ -41,20 +47,31 @@ class FakeHealthSource implements HealthSource {
   Set<StatMetric> get readableMetrics => _fakeMetrics;
 
   @override
-  Future<HealthAvailability> availability() async => availabilityResult;
+  Future<HealthAvailability> availability() async {
+    final error = availabilityError;
+    if (error != null) throw error;
+    return availabilityResult;
+  }
 
   @override
   Future<void> openInstallPage() async => openInstallPageCalls++;
 
+  void _throwPermissionsError() {
+    final error = permissionsError;
+    if (error != null) throw error;
+  }
+
   @override
   Future<HealthPermissionResult> requestPermissions() async {
     requestPermissionsCalls++;
+    _throwPermissionsError();
     return HealthPermissionResult(permissionOutcome);
   }
 
   @override
   Future<HealthPermissionResult> checkPermissions() async {
     checkPermissionsCalls++;
+    _throwPermissionsError();
     return HealthPermissionResult(permissionOutcome);
   }
 

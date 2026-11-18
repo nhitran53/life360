@@ -96,7 +96,7 @@ class SwitchableHealthSource implements HealthSource {
 /// belongs to the other platform is disabled. Both use [platformSource]
 /// (the health package picks the store by platform). Off a phone neither can
 /// be used, so [demoSource] stands in. [takeout] adds the dev-only Google
-/// Takeout option and, when given, is selected first.
+/// Health (Takeout) option and, when given, is selected first.
 SwitchableHealthSource buildHealthSourceOptions({
   required TargetPlatform platform,
   required bool isWeb,
@@ -118,14 +118,18 @@ SwitchableHealthSource buildHealthSourceOptions({
       ),
       HealthSourceOption(
         id: healthConnectOptionId,
-        label: 'Health Connect',
+        label: onIos ? 'Google Health Connect' : 'Health Connect',
         source: real,
-        unavailableNote: onAndroid ? null : 'Android only',
+        unavailableNote: onAndroid
+            ? null
+            : onIos && takeout != null
+            ? 'Android only; on iPhone use Google Health (Takeout)'
+            : 'Android only',
       ),
       if (takeout != null)
         HealthSourceOption(
           id: takeoutOptionId,
-          label: 'Google Takeout (dev)',
+          label: 'Google Health (Takeout)',
           source: takeout,
           note: takeoutNote,
         ),

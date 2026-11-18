@@ -40,6 +40,31 @@ void main() {
   HealthStatsRepository repo(FakeHealthSource source) =>
       HealthStatsRepository(source: source, fallback: mock, friends: friends);
 
+  group('platform store failures', () {
+    test('a throwing permission request maps to blockedInBuild', () async {
+      final r = repo(FakeHealthSource()..permissionsError = Exception('x'));
+      expect(await r.connect(), isFalse);
+      expect(r.availability, HealthAvailability.blockedInBuild);
+      expect(r.isConnected, isFalse);
+    });
+
+    test('a throwing availability check maps to blockedInBuild', () async {
+      final r = repo(FakeHealthSource()..availabilityError = Exception('x'));
+      expect(await r.connect(), isFalse);
+      expect(r.availability, HealthAvailability.blockedInBuild);
+    });
+
+    test('a denial is not blockedInBuild', () async {
+      final r = repo(
+        FakeHealthSource(
+          permissionOutcome: {StatMetric.steps: HealthPermissionStatus.denied},
+        ),
+      );
+      expect(await r.connect(), isFalse);
+      expect(r.availability, HealthAvailability.available);
+    });
+  });
+
   group('FakeHealthSource', () {
     test(
       'returns scripted days in range, oldest first, omitting empty days',

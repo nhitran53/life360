@@ -100,7 +100,7 @@ class AppServices {
               shiftToToday: true,
             )
           : null,
-      takeoutNote: 'Dev data shifted to end today',
+      takeoutNote: 'Your last export, shifted to end today',
     );
     final publishing = statsDb != null && userId != null && sharing != null;
     StatsSync? sync;

@@ -82,14 +82,25 @@ class HealthStatsRepository implements ConnectableStatsRepository {
   Future<bool> _sync(
     Future<HealthPermissionResult> Function() permissions,
   ) async {
-    _availability = await _source.availability();
-    if (_availability != HealthAvailability.available) {
+    try {
+      _availability = await _source.availability();
+      if (_availability != HealthAvailability.available) {
+        _permissions = null;
+        _connected = false;
+      } else {
+        _permissions = await permissions();
+        _connected = _permissions!.anyReadable;
+        if (_connected) _lastSyncedAt = _clock();
+      }
+    } on Exception {
+      // The platform store itself failed (not a user denial, which comes back
+      // as a result): treat the build as unable to use it. Other sources
+      // (e.g. Takeout) keep surfacing their own failures.
+      if (!_usesPlatformStore) rethrow;
+      // Never surface or log the error text: it could carry health details.
+      _availability = HealthAvailability.blockedInBuild;
       _permissions = null;
       _connected = false;
-    } else {
-      _permissions = await permissions();
-      _connected = _permissions!.anyReadable;
-      if (_connected) _lastSyncedAt = _clock();
     }
     await _remember(_connected);
     onSynced?.call();
@@ -128,6 +139,13 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     _lastSyncedAt = null;
     await _remember(false);
   }
+
+  /// Whether the selected source is Apple Health / Health Connect (or a
+  /// plain, non-switchable source) rather than Takeout.
+  bool get _usesPlatformStore => switch (selectedSourceId) {
+    null || appleHealthOptionId || healthConnectOptionId => true,
+    _ => false,
+  };
 
   @override
   List<HealthSourceOption> get sourceOptions => switch (_source) {

@@ -12,6 +12,11 @@ enum HealthAvailability {
 
   /// No health store on this platform (web, desktop).
   unsupported,
+
+  /// The platform store exists but this build can't use it, e.g. an iOS app
+  /// signed without the HealthKit entitlement (sideloaded). Not a user
+  /// permission denial.
+  blockedInBuild,
 }
 
 /// Outcome of asking for read access to one metric.

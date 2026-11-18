@@ -156,17 +156,29 @@ void main() {
 
     test('iOS: Apple Health usable, Health Connect disabled', () {
       final s = build(TargetPlatform.iOS);
-      expect(s.options.map((o) => o.label), ['Apple Health', 'Health Connect']);
+      expect(s.options.map((o) => o.label), [
+        'Apple Health',
+        'Google Health Connect',
+      ]);
       expect(s.options[0].isAvailable, isTrue);
       expect(s.options[1].unavailableNote, 'Android only');
       expect(s.selected.id, appleHealthOptionId);
       expect(s.displayName, 'Platform');
     });
 
+    test('iOS with Takeout points Health Connect users at Takeout', () {
+      final s = build(TargetPlatform.iOS, takeoutSource: takeout);
+      expect(
+        s.options[1].unavailableNote,
+        'Android only; on iPhone use Google Health (Takeout)',
+      );
+    });
+
     test('Android: Health Connect usable, Apple Health disabled', () {
       final s = build(TargetPlatform.android);
       expect(s.options[0].unavailableNote, 'iOS only');
       expect(s.options[1].isAvailable, isTrue);
+      expect(s.options[1].label, 'Health Connect');
       expect(s.selected.id, healthConnectOptionId);
     });
 
@@ -186,7 +198,7 @@ void main() {
         isNot(contains(takeoutOptionId)),
       );
       final s = build(TargetPlatform.iOS, takeoutSource: takeout);
-      expect(s.options.last.label, 'Google Takeout (dev)');
+      expect(s.options.last.label, 'Google Health (Takeout)');
       expect(s.options.last.note, 'shifted');
       expect(s.selected.id, takeoutOptionId);
       expect(s.displayName, 'Takeout');

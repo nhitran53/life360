@@ -72,6 +72,12 @@ class _ConnectCard extends StatelessWidget {
         case HealthAvailability.unsupported:
           title = '$source is not available';
           message = "This device can't sync health stats. Showing demo data.";
+        case HealthAvailability.blockedInBuild:
+          title = "$source isn't available in this build";
+          message = stats.sourceOptions.any((o) => o.id == takeoutOptionId)
+              ? "Sideloaded builds can't read $source. Use Google Health "
+                    '(Takeout) instead.'
+              : '$source needs a signed build with HealthKit.';
         case HealthAvailability.available:
           title = 'No access to $source';
           message = 'Allow reading your stats in $source, then try again.';
@@ -89,7 +95,9 @@ class _ConnectCard extends StatelessWidget {
         .where((o) => o.id == stats.selectedSourceId)
         .firstOrNull
         ?.note;
-    final unsupported = stats.availability == HealthAvailability.unsupported;
+    final unsupported =
+        stats.availability == HealthAvailability.unsupported ||
+        stats.availability == HealthAvailability.blockedInBuild;
     return ChunkyCard(
       key: const ValueKey('connect-card'),
       child: Column(
