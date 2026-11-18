@@ -479,7 +479,7 @@ void main() {
       'Apple Health blocked in this build explains it, keeps source buttons',
       (tester) async {
         final apple = sourceWith(displayName: 'Apple Health')
-          ..permissionsError = Exception('missing entitlement');
+          ..permissionsError = const HealthUnavailableInBuild();
         await pumpConnectable(
           tester,
           HealthStatsRepository(
@@ -524,7 +524,7 @@ void main() {
       await pumpSource(
         tester,
         sourceWith(displayName: 'Apple Health')
-          ..availabilityError = Exception('boom'),
+          ..permissionsError = const HealthUnavailableInBuild(),
       );
       await tapKey(tester, 'connect-button');
       expect(
@@ -532,7 +532,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.textContaining('needs a signed build with HealthKit'),
+        find.textContaining('needs a properly signed build'),
         findsOneWidget,
       );
       expect(find.textContaining('Takeout'), findsNothing);

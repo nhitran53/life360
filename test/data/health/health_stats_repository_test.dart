@@ -41,17 +41,26 @@ void main() {
       HealthStatsRepository(source: source, fallback: mock, friends: friends);
 
   group('platform store failures', () {
-    test('a throwing permission request maps to blockedInBuild', () async {
-      final r = repo(FakeHealthSource()..permissionsError = Exception('x'));
+    test('a recognized build restriction maps to blockedInBuild', () async {
+      final r = repo(
+        FakeHealthSource()..permissionsError = const HealthUnavailableInBuild(),
+      );
       expect(await r.connect(), isFalse);
       expect(r.availability, HealthAvailability.blockedInBuild);
       expect(r.isConnected, isFalse);
     });
 
-    test('a throwing availability check maps to blockedInBuild', () async {
-      final r = repo(FakeHealthSource()..availabilityError = Exception('x'));
-      expect(await r.connect(), isFalse);
-      expect(r.availability, HealthAvailability.blockedInBuild);
+    test('any other connect failure is generic, not blockedInBuild', () async {
+      final r = repo(FakeHealthSource()..permissionsError = Exception('x'));
+      await expectLater(r.connect(), throwsException);
+      expect(r.availability, HealthAvailability.available);
+      expect(r.isConnected, isFalse);
+
+      final unavailable = repo(
+        FakeHealthSource()..availabilityError = Exception('x'),
+      );
+      await expectLater(unavailable.connect(), throwsException);
+      expect(unavailable.availability, isNull);
     });
 
     test('a denial is not blockedInBuild', () async {

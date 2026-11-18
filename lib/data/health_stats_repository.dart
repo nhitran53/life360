@@ -92,12 +92,9 @@ class HealthStatsRepository implements ConnectableStatsRepository {
         _connected = _permissions!.anyReadable;
         if (_connected) _lastSyncedAt = _clock();
       }
-    } on Exception {
-      // The platform store itself failed (not a user denial, which comes back
-      // as a result): treat the build as unable to use it. Other sources
-      // (e.g. Takeout) keep surfacing their own failures.
-      if (!_usesPlatformStore) rethrow;
-      // Never surface or log the error text: it could carry health details.
+    } on HealthUnavailableInBuild {
+      // The source positively identified that this build can't use the
+      // store. Any other failure propagates to the caller unchanged.
       _availability = HealthAvailability.blockedInBuild;
       _permissions = null;
       _connected = false;
@@ -139,13 +136,6 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     _lastSyncedAt = null;
     await _remember(false);
   }
-
-  /// Whether the selected source is Apple Health / Health Connect (or a
-  /// plain, non-switchable source) rather than Takeout.
-  bool get _usesPlatformStore => switch (selectedSourceId) {
-    null || appleHealthOptionId || healthConnectOptionId => true,
-    _ => false,
-  };
 
   @override
   List<HealthSourceOption> get sourceOptions => switch (_source) {

@@ -77,7 +77,7 @@ class _ConnectCard extends StatelessWidget {
           message = stats.sourceOptions.any((o) => o.id == takeoutOptionId)
               ? "Sideloaded builds can't read $source. Use Google Health "
                     '(Takeout) instead.'
-              : '$source needs a signed build with HealthKit.';
+              : '$source needs a properly signed build.';
         case HealthAvailability.available:
           title = 'No access to $source';
           message = 'Allow reading your stats in $source, then try again.';

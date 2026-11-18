@@ -193,6 +193,18 @@ void main() {
       },
     );
 
+    test('a transient permission failure on restore keeps the flag', () async {
+      final store = InMemoryHealthConnectionStore(connected: true);
+      final r = repo(
+        FakeHealthSource()..permissionsError = Exception('temporary'),
+        store,
+      );
+      await r.restoreConnection();
+      expect(r.isConnected, isFalse);
+      expect(r.availability, isNot(HealthAvailability.blockedInBuild));
+      expect(await store.loadConnected(), isTrue);
+    });
+
     test('a broken store never breaks connecting', () async {
       final r = repo(FakeHealthSource(), _ThrowingStore());
       await r.restoreConnection();
