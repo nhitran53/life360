@@ -17,9 +17,12 @@ import 'health_source.dart';
 /// Needs a real device or emulator with a health store; the logic that can be
 /// unit-tested lives in `health_aggregation.dart`.
 class HealthPackageSource implements HealthSource {
-  HealthPackageSource({Health? health}) : _health = health ?? Health();
+  HealthPackageSource({Health? health, bool? isIOS})
+    : _health = health ?? Health(),
+      _isIOS = isIOS ?? Platform.isIOS;
 
   final Health _health;
+  final bool _isIOS;
   bool _configured = false;
 
   /// Most days whose platform queries are in flight at once in
@@ -61,14 +64,14 @@ class HealthPackageSource implements HealthSource {
   }
 
   @override
-  String get displayName => Platform.isIOS ? 'Apple Health' : 'Health Connect';
+  String get displayName => _isIOS ? 'Apple Health' : 'Health Connect';
 
   @override
   Future<void> openInstallPage() => _health.installHealthConnect();
 
   @override
   Future<HealthAvailability> availability() async {
-    if (Platform.isIOS) return HealthAvailability.available;
+    if (_isIOS) return HealthAvailability.available;
     if (!Platform.isAndroid) return HealthAvailability.unsupported;
     return switch (await _health.getHealthConnectSdkStatus()) {
       HealthConnectSdkStatus.sdkAvailable => HealthAvailability.available,
@@ -83,10 +86,17 @@ class HealthPackageSource implements HealthSource {
     await _ensureConfigured();
     final types = [for (final m in readableMetrics) ..._typesFor(m)];
     try {
-      await _health.requestAuthorization(
+      final completed = await _health.requestAuthorization(
         types,
         permissions: List.filled(types.length, HealthDataAccess.READ),
       );
+      // On iOS the plugin reports true whenever HealthKit handled the request,
+      // whatever the user chose (read denials are invisible), and false only
+      // when HealthKit itself refused it, i.e. no entitlement (sideloaded
+      // build) or no Health store on the device.
+      if (_isIOS && !completed) throw const HealthUnavailableInBuild();
+    } on HealthUnavailableInBuild {
+      rethrow;
     } on Object {
       // Any failure is fine here (the plugin isn't consistent about what it
       // throws), e.g. the permission screen cannot open. The per-metric check

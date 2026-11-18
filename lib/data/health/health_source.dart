@@ -12,6 +12,22 @@ enum HealthAvailability {
 
   /// No health store on this platform (web, desktop).
   unsupported,
+
+  /// The platform store exists but this build can't use it, e.g. an iOS app
+  /// signed without the HealthKit entitlement (sideloaded). Not a user
+  /// permission denial.
+  blockedInBuild,
+}
+
+/// Thrown by a [HealthSource] that positively identified that this build
+/// cannot use the platform store (e.g. an iOS app signed without the HealthKit
+/// entitlement). Anything else a source throws is a generic failure, never
+/// this. Carries no details, as they could include health data.
+class HealthUnavailableInBuild implements Exception {
+  const HealthUnavailableInBuild();
+
+  @override
+  String toString() => 'HealthUnavailableInBuild';
 }
 
 /// Outcome of asking for read access to one metric.

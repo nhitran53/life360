@@ -6,11 +6,13 @@ import 'package:life360/data/connectable_stats_repository.dart';
 import 'package:life360/data/health/fake_health_source.dart';
 import 'package:life360/data/health/health_connection_store.dart';
 import 'package:life360/data/health/health_source.dart';
+import 'package:life360/data/health/switchable_health_source.dart';
 import 'package:life360/data/health_stats_repository.dart';
 import 'package:life360/data/mock_data.dart';
 import 'package:life360/data/mock_friends_repository.dart';
 import 'package:life360/data/mock_stats_repository.dart';
 import 'package:life360/models/models.dart';
+import 'package:life360/widgets/chunky.dart';
 import 'package:life360/screens/leaderboard_screen.dart';
 import 'package:life360/screens/my_stats_screen.dart';
 import 'package:life360/theme/app_theme.dart';
@@ -226,6 +228,94 @@ void main() {
       expect(find.text('Showing demo data'), findsOneWidget);
     });
 
+    Future<void> pumpOptions(
+      WidgetTester tester,
+      TargetPlatform platform, {
+      bool withTakeout = false,
+    }) async {
+      await pumpConnectable(
+        tester,
+        HealthStatsRepository(
+          source: buildHealthSourceOptions(
+            platform: platform,
+            isWeb: false,
+            platformSource: sourceWith(
+              displayName: platform == TargetPlatform.iOS
+                  ? 'Apple Health'
+                  : 'Health Connect',
+            ),
+            demoSource: sourceWith(),
+            takeout: withTakeout
+                ? sourceWith(displayName: 'Google Health (Takeout)')
+                : null,
+            takeoutNote: 'Your last export, shifted to end today',
+          ),
+          fallback: MockStatsRepository(friends: realFriends),
+          friends: realFriends,
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    bool tappable(WidgetTester tester, String key) {
+      final button = tester.widget<ChunkyButton>(find.byKey(ValueKey(key)));
+      return button.onPressed != null;
+    }
+
+    testWidgets('iOS: Apple Health connects, Health Connect is disabled', (
+      tester,
+    ) async {
+      await pumpOptions(tester, TargetPlatform.iOS);
+      expect(find.text('Data source'), findsOneWidget);
+      expect(tappable(tester, 'source-apple-health'), isTrue);
+      expect(tappable(tester, 'source-health-connect'), isFalse);
+      expect(find.text('Google Health Connect'), findsOneWidget);
+      expect(find.text('Android only'), findsOneWidget);
+      expect(find.text('iOS only'), findsNothing);
+      expect(find.byKey(const ValueKey('source-takeout')), findsNothing);
+
+      await tapKey(tester, 'source-apple-health');
+      expect(find.text('Apple Health connected'), findsOneWidget);
+    });
+
+    testWidgets('Android: Health Connect is usable, Apple Health disabled', (
+      tester,
+    ) async {
+      await pumpOptions(tester, TargetPlatform.android);
+      expect(tappable(tester, 'source-apple-health'), isFalse);
+      expect(tappable(tester, 'source-health-connect'), isTrue);
+      expect(find.text('iOS only'), findsOneWidget);
+      expect(find.byKey(const ValueKey('source-takeout')), findsNothing);
+    });
+
+    testWidgets('iOS with Takeout: Health Connect note points to Takeout', (
+      tester,
+    ) async {
+      await pumpOptions(tester, TargetPlatform.iOS, withTakeout: true);
+      expect(
+        find.text('Android only; on iPhone use Google Health (Takeout)'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Takeout is offered and switches in when defined', (
+      tester,
+    ) async {
+      await pumpOptions(tester, TargetPlatform.iOS, withTakeout: true);
+      expect(find.text('Connect Google Health (Takeout)'), findsOneWidget);
+
+      await tapKey(tester, 'source-apple-health');
+      expect(find.text('Apple Health connected'), findsOneWidget);
+      expect(find.textContaining('shifted'), findsNothing);
+
+      await tapKey(tester, 'source-takeout');
+      expect(find.text('Google Health (Takeout) connected'), findsOneWidget);
+      expect(
+        find.textContaining('Your last export, shifted to end today'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('connecting syncs real stats and offers Sync now', (
       tester,
     ) async {
@@ -383,6 +473,88 @@ void main() {
       await tapKey(tester, 'connect-button');
       expect(find.text('Health Connect is not available'), findsOneWidget);
       expect(find.byKey(const ValueKey('connect-button')), findsNothing);
+    });
+
+    testWidgets(
+      'Apple Health blocked in this build explains it, keeps source buttons',
+      (tester) async {
+        final apple = sourceWith(displayName: 'Apple Health')
+          ..permissionsError = const HealthUnavailableInBuild();
+        await pumpConnectable(
+          tester,
+          HealthStatsRepository(
+            source: buildHealthSourceOptions(
+              platform: TargetPlatform.iOS,
+              isWeb: false,
+              platformSource: apple,
+              demoSource: sourceWith(),
+              takeout: sourceWith(displayName: 'Google Health (Takeout)'),
+              takeoutNote: 'note',
+            ),
+            fallback: MockStatsRepository(friends: realFriends),
+            friends: realFriends,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tapKey(tester, 'source-apple-health');
+
+        expect(
+          find.text("Apple Health isn't available in this build"),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining(
+            "Sideloaded builds can't read Apple Health. Use Google Health "
+            '(Takeout) instead.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining("Couldn't reach"), findsNothing);
+        expect(find.byKey(const ValueKey('connect-button')), findsNothing);
+        expect(tappable(tester, 'source-takeout'), isTrue);
+
+        await tapKey(tester, 'source-takeout');
+        expect(find.text('Google Health (Takeout) connected'), findsOneWidget);
+      },
+    );
+
+    testWidgets('blocked without a Takeout option mentions a signed build', (
+      tester,
+    ) async {
+      await pumpSource(
+        tester,
+        sourceWith(displayName: 'Apple Health')
+          ..permissionsError = const HealthUnavailableInBuild(),
+      );
+      await tapKey(tester, 'connect-button');
+      expect(
+        find.text("Apple Health isn't available in this build"),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('needs a properly signed build'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Takeout'), findsNothing);
+    });
+
+    testWidgets('a normal permission denial is not the blocked state', (
+      tester,
+    ) async {
+      await pumpSource(
+        tester,
+        sourceWith(
+          permissions: {
+            for (final m in StatMetric.values) m: HealthPermissionStatus.denied,
+          },
+        ),
+      );
+      await tapKey(tester, 'connect-button');
+      expect(find.text('No access to Health Connect'), findsOneWidget);
+      expect(
+        find.textContaining("isn't available in this build"),
+        findsNothing,
+      );
     });
 
     testWidgets('an empty week says no data instead of showing zeros', (
@@ -545,4 +717,13 @@ class _StubStats implements ConnectableStatsRepository {
 
   @override
   Future<void> openInstallPage() async {}
+
+  @override
+  List<HealthSourceOption> get sourceOptions => const [];
+
+  @override
+  String? get selectedSourceId => null;
+
+  @override
+  Future<void> selectSource(String id) async {}
 }

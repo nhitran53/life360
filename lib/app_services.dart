@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -14,6 +15,7 @@ import 'data/health/fake_health_source.dart';
 import 'data/health/health_connection_store.dart';
 import 'data/health/health_package_source.dart';
 import 'data/health/health_source.dart';
+import 'data/health/switchable_health_source.dart';
 import 'data/health/takeout_health_source.dart';
 import 'data/health_stats_repository.dart';
 import 'data/mock_circle_repository.dart';
@@ -78,15 +80,28 @@ class AppServices {
     final onPhone = isPhone;
     // Debug only: `--dart-define=TAKEOUT_JSON=/path/daily.json` serves real
     // daily totals from a Takeout export instead of the platform store.
+    // `TAKEOUT_B64` carries the base64 JSON itself, for devices with no shared path.
     const takeoutPath = String.fromEnvironment('TAKEOUT_JSON');
-    final HealthSource source = kDebugMode && !kIsWeb && takeoutPath.isNotEmpty
-        ? TakeoutHealthSource(load: () => File(takeoutPath).readAsString())
-        : onPhone
-        ? HealthPackageSource()
-        : FakeHealthSource(
-            stats: generateMockStats(today: DateTime.now())
-                .where((s) => s.userId == mockMe.id),
-          );
+    const takeoutData = String.fromEnvironment('TAKEOUT_B64');
+    final hasTakeout =
+        kDebugMode &&
+        (takeoutData.isNotEmpty || (!kIsWeb && takeoutPath.isNotEmpty));
+    final demo = _demoSource();
+    final source = buildHealthSourceOptions(
+      platform: defaultTargetPlatform,
+      isWeb: kIsWeb,
+      platformSource: onPhone ? HealthPackageSource() : demo,
+      demoSource: demo,
+      takeout: hasTakeout
+          ? TakeoutHealthSource(
+              load: () => takeoutData.isNotEmpty
+                  ? Future.value(utf8.decode(base64Decode(takeoutData)))
+                  : File(takeoutPath).readAsString(),
+              shiftToToday: true,
+            )
+          : null,
+      takeoutNote: 'Your last export, shifted to end today',
+    );
     final publishing = statsDb != null && userId != null && sharing != null;
     StatsSync? sync;
     // Friends' settings are private to them: with Firestore, what they share
@@ -134,6 +149,12 @@ class AppServices {
     unawaited(health.restoreConnection());
     return services;
   }
+
+  /// Mock data for the current user, for platforms with no health store.
+  static HealthSource _demoSource() => FakeHealthSource(
+    stats: generateMockStats(today: DateTime.now())
+        .where((s) => s.userId == mockMe.id),
+  );
 
   late final ManualScreenTimeRepository _manualStats;
   StatsSync? _sync;

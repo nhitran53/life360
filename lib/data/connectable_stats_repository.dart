@@ -1,5 +1,6 @@
 import '../models/models.dart';
 import 'health/health_source.dart';
+import 'health/switchable_health_source.dart';
 import 'stats_repository.dart';
 
 /// A [StatsRepository] whose current-user stats come from a health platform
@@ -31,4 +32,15 @@ abstract interface class ConnectableStatsRepository implements StatsRepository {
 
   /// Sends the user to the store to install or update the health app.
   Future<void> openInstallPage();
+
+  /// The data sources the user can pick from, or empty when there is no
+  /// choice (a single fixed source).
+  List<HealthSourceOption> get sourceOptions;
+
+  /// Id of the option now in use, or null when [sourceOptions] is empty.
+  String? get selectedSourceId;
+
+  /// Disconnects, switches to the option with [id] and forgets the saved
+  /// connection. The caller then runs [connect] for the new source.
+  Future<void> selectSource(String id);
 }

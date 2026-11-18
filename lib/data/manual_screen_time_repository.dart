@@ -3,6 +3,7 @@ import 'connectable_stats_repository.dart';
 import 'device_screen_time.dart';
 import 'friends_repository.dart';
 import 'health/health_source.dart';
+import 'health/switchable_health_source.dart';
 import 'screen_time_log.dart';
 
 /// Wraps another [ConnectableStatsRepository] and puts the current user's
@@ -57,6 +58,15 @@ class ManualScreenTimeRepository implements ConnectableStatsRepository {
 
   @override
   Future<void> openInstallPage() => _inner.openInstallPage();
+
+  @override
+  List<HealthSourceOption> get sourceOptions => _inner.sourceOptions;
+
+  @override
+  String? get selectedSourceId => _inner.selectedSourceId;
+
+  @override
+  Future<void> selectSource(String id) => _inner.selectSource(id);
 
   @override
   Future<List<DailyStats>> dailyStats(

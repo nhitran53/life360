@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health/health.dart';
 import 'package:life360/data/health/health_package_source.dart';
+import 'package:life360/data/health/health_source.dart';
 
 /// Scripts only what [HealthPackageSource.fetchDailyStats] calls when just
 /// steps and calories are readable. Anything else throws via [Fake].
@@ -33,8 +34,17 @@ class _FakeHealth extends Fake implements Health {
     }
   }
 
+  /// What [requestAuthorization] returns.
+  bool authorizationResult = true;
+
   @override
   Future<void> configure() async {}
+
+  @override
+  Future<bool> requestAuthorization(
+    List<HealthDataType> types, {
+    List<HealthDataAccess>? permissions,
+  }) async => authorizationResult;
 
   @override
   bool isDataTypeAvailable(HealthDataType dataType) => true;
@@ -91,6 +101,39 @@ class _FakeHealth extends Fake implements Health {
 void main() {
   final from = DateTime(2026, 3, 9); // Monday
   final to = DateTime(2026, 3, 13);
+
+  group('HealthPackageSource.requestPermissions', () {
+    _FakeHealth fakeHealth({required bool authorized}) =>
+        _FakeHealth(steps: (_) async => 0, calories: (_) async => 0)
+          ..authorizationResult = authorized;
+
+    test('iOS refusing the request itself is a build restriction', () async {
+      final source = HealthPackageSource(
+        health: fakeHealth(authorized: false),
+        isIOS: true,
+      );
+      await expectLater(
+        source.requestPermissions(),
+        throwsA(isA<HealthUnavailableInBuild>()),
+      );
+    });
+
+    test('iOS handling the request is not a build restriction', () async {
+      final source = HealthPackageSource(
+        health: fakeHealth(authorized: true),
+        isIOS: true,
+      );
+      expect((await source.requestPermissions()).anyReadable, isTrue);
+    });
+
+    test('a false result off iOS is not a build restriction', () async {
+      final source = HealthPackageSource(
+        health: fakeHealth(authorized: false),
+        isIOS: false,
+      );
+      expect((await source.requestPermissions()).anyReadable, isTrue);
+    });
+  });
 
   group('HealthPackageSource.fetchDailyStats', () {
     test(
