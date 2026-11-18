@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -78,9 +79,17 @@ class AppServices {
     final onPhone = isPhone;
     // Debug only: `--dart-define=TAKEOUT_JSON=/path/daily.json` serves real
     // daily totals from a Takeout export instead of the platform store.
+    // `TAKEOUT_B64` carries the base64 JSON itself, for devices with no shared path.
     const takeoutPath = String.fromEnvironment('TAKEOUT_JSON');
-    final HealthSource source = kDebugMode && !kIsWeb && takeoutPath.isNotEmpty
-        ? TakeoutHealthSource(load: () => File(takeoutPath).readAsString())
+    const takeoutData = String.fromEnvironment('TAKEOUT_B64');
+    final HealthSource source =
+        kDebugMode &&
+            (takeoutData.isNotEmpty || (!kIsWeb && takeoutPath.isNotEmpty))
+        ? TakeoutHealthSource(
+            load: () => takeoutData.isNotEmpty
+                ? Future.value(utf8.decode(base64Decode(takeoutData)))
+                : File(takeoutPath).readAsString(),
+          )
         : onPhone
         ? HealthPackageSource()
         : FakeHealthSource(
