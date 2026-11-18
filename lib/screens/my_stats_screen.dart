@@ -7,6 +7,7 @@ import '../data/connectable_stats_repository.dart';
 import '../data/device_screen_time.dart';
 import '../data/friends_repository.dart';
 import '../data/health/health_source.dart';
+import '../data/health/switchable_health_source.dart';
 import '../data/mock_friends_repository.dart';
 import '../data/mock_stats_repository.dart';
 import '../data/screen_time_log.dart';
@@ -186,6 +187,29 @@ class _MyStatsScreenState extends State<MyStatsScreen>
     });
   }
 
+  /// Switches the data source, then runs the normal connect flow for it.
+  Future<void> _selectSource(
+    ConnectableStatsRepository stats,
+    String id,
+  ) async {
+    if (id != stats.selectedSourceId) {
+      setState(() => _syncing = true);
+      try {
+        await stats.selectSource(id);
+      } on Exception {
+        // Never surface or log the error text: it could carry health details.
+        if (!mounted) return;
+        setState(() {
+          _syncing = false;
+          _syncFailed = true;
+        });
+        return;
+      }
+      if (!mounted) return;
+    }
+    await _connect(stats);
+  }
+
   /// Opens the screen time sheet, then saves and reloads.
   Future<void> _logScreenTime(ScreenTimeLog log, int current) async {
     final day = dateOnly(_clock());
@@ -258,6 +282,7 @@ class _MyStatsScreenState extends State<MyStatsScreen>
                     busy: _syncing,
                     failed: _syncFailed,
                     onConnect: () => _connect(connectable),
+                    onSelectSource: (id) => _selectSource(connectable, id),
                     onInstall: connectable.openInstallPage,
                   ),
                   const SizedBox(height: 16),

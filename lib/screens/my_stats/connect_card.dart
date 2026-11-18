@@ -12,6 +12,7 @@ class _ConnectCard extends StatelessWidget {
     required this.busy,
     required this.failed,
     required this.onConnect,
+    required this.onSelectSource,
     required this.onInstall,
   });
 
@@ -19,6 +20,9 @@ class _ConnectCard extends StatelessWidget {
   final bool busy;
   final bool failed;
   final VoidCallback onConnect;
+
+  /// Called with the option id when the user picks a data source.
+  final ValueChanged<String> onSelectSource;
   final VoidCallback onInstall;
 
   @override
@@ -81,6 +85,10 @@ class _ConnectCard extends StatelessWidget {
           : AppColors.orange;
     }
 
+    final selectedNote = stats.sourceOptions
+        .where((o) => o.id == stats.selectedSourceId)
+        .firstOrNull
+        ?.note;
     final unsupported = stats.availability == HealthAvailability.unsupported;
     return ChunkyCard(
       key: const ValueKey('connect-card'),
@@ -96,9 +104,26 @@ class _ConnectCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            message,
+            selectedNote == null ? message : '$message $selectedNote.',
             style: theme.bodyMedium?.copyWith(color: AppColors.inkSoft),
           ),
+          if (stats.sourceOptions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('Data source', style: theme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final option in stats.sourceOptions)
+                  _SourceOptionButton(
+                    option: option,
+                    selected: option.id == stats.selectedSourceId,
+                    onPressed: busy ? null : () => onSelectSource(option.id),
+                  ),
+              ],
+            ),
+          ],
           if (!unsupported) ...[
             const SizedBox(height: 12),
             if (installLabel != null) ...[
@@ -127,6 +152,54 @@ class _ConnectCard extends StatelessWidget {
                     onPressed: busy ? null : onConnect,
                   ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One "Data source" choice. A source for another platform is disabled and
+/// says which platform it needs.
+class _SourceOptionButton extends StatelessWidget {
+  const _SourceOptionButton({
+    required this.option,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final HealthSourceOption option;
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final note = option.unavailableNote;
+    final onTap = option.isAvailable ? onPressed : null;
+    return SizedBox(
+      width: 160,
+      child: Column(
+        children: [
+          selected && option.isAvailable
+              ? ChunkyButton(
+                  key: ValueKey('source-${option.id}'),
+                  label: option.label,
+                  onPressed: onTap,
+                )
+              : ChunkyButton.secondary(
+                  key: ValueKey('source-${option.id}'),
+                  label: option.label,
+                  onPressed: onTap,
+                ),
+          if (note != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                note,
+                key: ValueKey('source-note-${option.id}'),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: AppColors.muted),
+              ),
+            ),
         ],
       ),
     );

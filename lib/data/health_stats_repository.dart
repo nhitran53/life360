@@ -5,6 +5,7 @@ import 'connectable_stats_repository.dart';
 import 'friends_repository.dart';
 import 'health/health_connection_store.dart';
 import 'health/health_source.dart';
+import 'health/switchable_health_source.dart';
 import 'stats_repository.dart';
 
 /// [StatsRepository] that serves the current user's stats from a
@@ -126,6 +127,36 @@ class HealthStatsRepository implements ConnectableStatsRepository {
     _permissions = null;
     _lastSyncedAt = null;
     await _remember(false);
+  }
+
+  @override
+  List<HealthSourceOption> get sourceOptions => switch (_source) {
+    SwitchableHealthSource(:final options) => options,
+    _ => const [],
+  };
+
+  @override
+  String? get selectedSourceId => switch (_source) {
+    SwitchableHealthSource(:final selected) => selected.id,
+    _ => null,
+  };
+
+  @override
+  Future<void> selectSource(String id) async {
+    final source = _source;
+    if (source is! SwitchableHealthSource) {
+      throw StateError('This repository has a single fixed source');
+    }
+    // Validate first so a bad id leaves the current connection alone.
+    final option = source.options.where((o) => o.id == id).firstOrNull;
+    if (option == null || !option.isAvailable) {
+      throw ArgumentError.value(id, 'id', 'Not a usable source option');
+    }
+    await disconnect();
+    _availability = null;
+    // shortcut: the choice isn't saved, so a restart goes back to the default
+    // source (Takeout in debug builds, else the platform's).
+    source.select(id);
   }
 
   /// Persists the flag. A broken store must not break connecting.

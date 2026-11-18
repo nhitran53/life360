@@ -17,12 +17,25 @@ class TakeoutLoadException implements Exception {
 /// `{"days": [{"date": "yyyy-mm-dd", "steps": 0, "sleepMinutes": 0,
 /// "workoutMinutes": 0, "activeCalories": 0}]}`.
 ///
+/// With [shiftToToday] every date moves by the same number of days so the
+/// latest day in the export is today (per [clock]), and every day from the
+/// first to the latest export day is returned, missing metrics as 0. That
+/// keeps the current week from looking empty with an old export. Dev only.
+///
 /// It holds totals only (no raw samples, heart rate or location) and never
 /// logs values. Not meant for release builds.
 class TakeoutHealthSource implements HealthSource {
-  TakeoutHealthSource({required this._load});
+  TakeoutHealthSource({
+    required this._load,
+    this.shiftToToday = false,
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now;
 
   final Future<String> Function() _load;
+  final DateTime Function() _clock;
+
+  /// Moves the export so its latest day is today.
+  final bool shiftToToday;
 
   @override
   String get displayName => 'Google Takeout (dev)';
@@ -74,15 +87,54 @@ class TakeoutHealthSource implements HealthSource {
     }
     final rows = decoded is Map ? decoded['days'] : null;
     if (rows is! List) return [];
-    final days = <DailyStats>[];
+    final parsed = <DailyStats>[];
     for (final row in rows) {
       final s = _parseRow(row, userId);
-      if (s == null || s.date.isBefore(start) || s.date.isAfter(end)) continue;
-      if (s.steps + s.sleepMinutes + s.workoutMinutes + s.activeCalories > 0) {
-        days.add(s);
-      }
+      if (s != null) parsed.add(s);
     }
-    return days..sort((a, b) => a.date.compareTo(b.date));
+    final days = shiftToToday ? _shifted(parsed, userId) : parsed;
+    return [
+      for (final s in days)
+        if (!s.date.isBefore(start) &&
+            !s.date.isAfter(end) &&
+            (shiftToToday ||
+                s.steps + s.sleepMinutes + s.workoutMinutes + s.activeCalories >
+                    0))
+          s,
+    ]..sort((a, b) => a.date.compareTo(b.date));
+  }
+
+  /// [parsed] moved so its latest day is today, with a (possibly all-zero)
+  /// entry for every day in between.
+  List<DailyStats> _shifted(List<DailyStats> parsed, String userId) {
+    if (parsed.isEmpty) return parsed;
+    final dates = [for (final s in parsed) dateOnly(s.date)]..sort();
+    final today = dateOnly(_clock());
+    final shiftDays = DateTime.utc(today.year, today.month, today.day)
+        .difference(
+          DateTime.utc(dates.last.year, dates.last.month, dates.last.day),
+        )
+        .inDays;
+    DateTime moved(DateTime d) => DateTime(d.year, d.month, d.day + shiftDays);
+    final byDate = {for (final s in parsed) moved(dateOnly(s.date)): s};
+    final first = moved(dates.first);
+    final last = moved(dates.last);
+    return [
+      for (
+        var d = first;
+        !d.isAfter(last);
+        d = DateTime(d.year, d.month, d.day + 1)
+      )
+        DailyStats(
+          userId: userId,
+          date: d,
+          steps: byDate[d]?.steps ?? 0,
+          sleepMinutes: byDate[d]?.sleepMinutes ?? 0,
+          workoutMinutes: byDate[d]?.workoutMinutes ?? 0,
+          activeCalories: byDate[d]?.activeCalories ?? 0,
+          screenTimeMinutes: byDate[d]?.screenTimeMinutes ?? 0,
+        ),
+    ];
   }
 
   /// One day from an export row, or null for a malformed row: a missing or

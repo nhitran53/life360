@@ -4,6 +4,7 @@ import 'package:life360/data/connectable_stats_repository.dart';
 import 'package:life360/data/firestore_sharing_repository.dart';
 import 'package:life360/data/firestore_stats_publisher.dart';
 import 'package:life360/data/health/health_source.dart';
+import 'package:life360/data/health/switchable_health_source.dart';
 import 'package:life360/data/sharing_repository.dart';
 import 'package:life360/data/stats_sync.dart';
 import 'package:life360/models/models.dart';
@@ -474,6 +475,15 @@ class _FakeSource implements ConnectableStatsRepository {
 
   @override
   Future<void> openInstallPage() async {}
+
+  @override
+  List<HealthSourceOption> get sourceOptions => const [];
+
+  @override
+  String? get selectedSourceId => null;
+
+  @override
+  Future<void> selectSource(String id) async {}
 
   @override
   Future<WeeklySummary> weeklySummary(String userId, {DateTime? weekOf}) =>

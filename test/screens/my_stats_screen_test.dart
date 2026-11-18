@@ -6,11 +6,13 @@ import 'package:life360/data/connectable_stats_repository.dart';
 import 'package:life360/data/health/fake_health_source.dart';
 import 'package:life360/data/health/health_connection_store.dart';
 import 'package:life360/data/health/health_source.dart';
+import 'package:life360/data/health/switchable_health_source.dart';
 import 'package:life360/data/health_stats_repository.dart';
 import 'package:life360/data/mock_data.dart';
 import 'package:life360/data/mock_friends_repository.dart';
 import 'package:life360/data/mock_stats_repository.dart';
 import 'package:life360/models/models.dart';
+import 'package:life360/widgets/chunky.dart';
 import 'package:life360/screens/leaderboard_screen.dart';
 import 'package:life360/screens/my_stats_screen.dart';
 import 'package:life360/theme/app_theme.dart';
@@ -224,6 +226,83 @@ void main() {
       await pumpSource(tester, sourceWith(displayName: 'Apple Health'));
       expect(find.text('Connect Apple Health'), findsOneWidget);
       expect(find.text('Showing demo data'), findsOneWidget);
+    });
+
+    Future<void> pumpOptions(
+      WidgetTester tester,
+      TargetPlatform platform, {
+      bool withTakeout = false,
+    }) async {
+      await pumpConnectable(
+        tester,
+        HealthStatsRepository(
+          source: buildHealthSourceOptions(
+            platform: platform,
+            isWeb: false,
+            platformSource: sourceWith(
+              displayName: platform == TargetPlatform.iOS
+                  ? 'Apple Health'
+                  : 'Health Connect',
+            ),
+            demoSource: sourceWith(),
+            takeout: withTakeout
+                ? sourceWith(displayName: 'Google Takeout (dev)')
+                : null,
+            takeoutNote: 'Dev data shifted to end today',
+          ),
+          fallback: MockStatsRepository(friends: realFriends),
+          friends: realFriends,
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    bool tappable(WidgetTester tester, String key) {
+      final button = tester.widget<ChunkyButton>(find.byKey(ValueKey(key)));
+      return button.onPressed != null;
+    }
+
+    testWidgets('iOS: Apple Health connects, Health Connect is disabled', (
+      tester,
+    ) async {
+      await pumpOptions(tester, TargetPlatform.iOS);
+      expect(find.text('Data source'), findsOneWidget);
+      expect(tappable(tester, 'source-apple-health'), isTrue);
+      expect(tappable(tester, 'source-health-connect'), isFalse);
+      expect(find.text('Android only'), findsOneWidget);
+      expect(find.text('iOS only'), findsNothing);
+      expect(find.byKey(const ValueKey('source-takeout')), findsNothing);
+
+      await tapKey(tester, 'source-apple-health');
+      expect(find.text('Apple Health connected'), findsOneWidget);
+    });
+
+    testWidgets('Android: Health Connect is usable, Apple Health disabled', (
+      tester,
+    ) async {
+      await pumpOptions(tester, TargetPlatform.android);
+      expect(tappable(tester, 'source-apple-health'), isFalse);
+      expect(tappable(tester, 'source-health-connect'), isTrue);
+      expect(find.text('iOS only'), findsOneWidget);
+      expect(find.byKey(const ValueKey('source-takeout')), findsNothing);
+    });
+
+    testWidgets('Takeout is offered and switches in when defined', (
+      tester,
+    ) async {
+      await pumpOptions(tester, TargetPlatform.iOS, withTakeout: true);
+      expect(find.text('Connect Google Takeout (dev)'), findsOneWidget);
+
+      await tapKey(tester, 'source-apple-health');
+      expect(find.text('Apple Health connected'), findsOneWidget);
+      expect(find.textContaining('shifted'), findsNothing);
+
+      await tapKey(tester, 'source-takeout');
+      expect(find.text('Google Takeout (dev) connected'), findsOneWidget);
+      expect(
+        find.textContaining('Dev data shifted to end today'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('connecting syncs real stats and offers Sync now', (
@@ -545,4 +624,13 @@ class _StubStats implements ConnectableStatsRepository {
 
   @override
   Future<void> openInstallPage() async {}
+
+  @override
+  List<HealthSourceOption> get sourceOptions => const [];
+
+  @override
+  String? get selectedSourceId => null;
+
+  @override
+  Future<void> selectSource(String id) async {}
 }

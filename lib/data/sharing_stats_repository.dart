@@ -2,6 +2,7 @@ import '../models/models.dart';
 import 'connectable_stats_repository.dart';
 import 'friends_repository.dart';
 import 'health/health_source.dart';
+import 'health/switchable_health_source.dart';
 import 'published_sharing_repository.dart';
 import 'sharing_repository.dart';
 
@@ -61,6 +62,15 @@ class SharingStatsRepository implements ConnectableStatsRepository {
 
   @override
   Future<void> openInstallPage() => inner.openInstallPage();
+
+  @override
+  List<HealthSourceOption> get sourceOptions => inner.sourceOptions;
+
+  @override
+  String? get selectedSourceId => inner.selectedSourceId;
+
+  @override
+  Future<void> selectSource(String id) => inner.selectSource(id);
 
   // --- Stats ---
 
