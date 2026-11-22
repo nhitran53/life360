@@ -18,7 +18,8 @@ abstract final class AppDepth {
 }
 
 abstract final class AppTheme {
-  static const fontFamily = 'Nunito';
+  /// Bundled in assets/fonts (weights 500–800).
+  static const fontFamily = 'Plus Jakarta Sans';
 
   static OutlineInputBorder _inputBorder(Color color) => OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.button),
@@ -44,19 +45,19 @@ abstract final class AppTheme {
       displayLarge: TextStyle(
           fontSize: 40, fontWeight: FontWeight.w800, height: 1.05, letterSpacing: -1),
       headlineLarge: TextStyle(
-          fontSize: 30, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: -0.5),
+          fontSize: 30, fontWeight: FontWeight.w700, height: 1.1, letterSpacing: -0.6),
       headlineMedium: TextStyle(
-          fontSize: 24, fontWeight: FontWeight.w800, height: 1.15, letterSpacing: -0.3),
-      titleLarge: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
-      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-      titleSmall: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-      bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, height: 1.4),
-      bodyMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.4),
+          fontSize: 24, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -0.4),
+      titleLarge: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      titleSmall: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, height: 1.45),
+      bodyMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, height: 1.45),
       bodySmall: TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.inkSoft),
-      labelLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-      labelMedium: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-      labelSmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.inkSoft),
+      labelLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      labelMedium: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      labelSmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
     );
 
     return ThemeData(
@@ -80,7 +81,7 @@ abstract final class AppTheme {
         titleTextStyle: TextStyle(
           fontFamily: fontFamily,
           fontSize: 18,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           color: AppColors.ink,
         ),
       ),
@@ -96,12 +97,12 @@ abstract final class AppTheme {
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         hintStyle: const TextStyle(
           fontFamily: fontFamily,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w500,
           color: AppColors.muted,
         ),
         errorStyle: const TextStyle(
           fontFamily: fontFamily,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: AppColors.redText,
         ),
         border: _inputBorder(AppColors.border),
@@ -118,7 +119,7 @@ abstract final class AppTheme {
         contentTextStyle: const TextStyle(
           fontFamily: fontFamily,
           fontSize: 15,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: Colors.white,
         ),
         shape: RoundedRectangleBorder(

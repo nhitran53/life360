@@ -66,16 +66,17 @@ flutter:
   assets:
     - assets/circle/
   fonts:
-    - family: Nunito
+    # Plus Jakarta Sans (SIL OFL 1.1, see assets/fonts/OFL-PlusJakartaSans.txt)
+    - family: Plus Jakarta Sans
       fonts:
-        - asset: assets/fonts/nunito-600.ttf
+        - asset: assets/fonts/plus-jakarta-sans-500.ttf
+          weight: 500
+        - asset: assets/fonts/plus-jakarta-sans-600.ttf
           weight: 600
-        - asset: assets/fonts/nunito-700.ttf
+        - asset: assets/fonts/plus-jakarta-sans-700.ttf
           weight: 700
-        - asset: assets/fonts/nunito-800.ttf
+        - asset: assets/fonts/plus-jakarta-sans-800.ttf
           weight: 800
-        - asset: assets/fonts/nunito-900.ttf
-          weight: 900
 
   # To add assets to your application, add an assets section, like this:
   # assets:
