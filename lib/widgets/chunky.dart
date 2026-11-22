@@ -87,7 +87,7 @@ class _ChunkySurfaceState extends State<ChunkySurface> {
             decoration: BoxDecoration(
               color: widget.color,
               borderRadius: radius,
-              border: border == null ? null : Border.all(color: border, width: 2),
+              border: border == null ? null : Border.all(color: border),
             ),
             child: widget.child,
           ),
