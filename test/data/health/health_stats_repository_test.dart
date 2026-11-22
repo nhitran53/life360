@@ -4,7 +4,10 @@ import 'package:life360/data/health/health_source.dart';
 import 'package:life360/data/health_stats_repository.dart';
 import 'package:life360/data/mock_friends_repository.dart';
 import 'package:life360/data/mock_stats_repository.dart';
+import 'package:life360/data/mock_data.dart';
 import 'package:life360/models/models.dart';
+
+import '../gated_test_doubles.dart';
 
 void main() {
   final today = DateTime(2026, 3, 11); // Wednesday
@@ -221,6 +224,25 @@ void main() {
       expect(week.daysTracked, 2);
     });
 
+    test('weekly summary without weekOf uses the injected clock', () async {
+      final source = FakeHealthSource(
+        stats: [
+          day(9, steps: 2000), // week of the injected clock
+          day(11, steps: 4000),
+        ],
+      );
+      final r = HealthStatsRepository(
+        source: source,
+        fallback: mock,
+        friends: friends,
+        clock: () => today,
+      );
+      await r.connect();
+      final week = await r.weeklySummary(me);
+      expect(week.weekStart, DateTime(2026, 3, 9));
+      expect(week.total(StatMetric.steps), 6000);
+    });
+
     test(
       'leaderboard ranks the health-backed user among mock friends',
       () async {
@@ -235,7 +257,9 @@ void main() {
     );
 
     test('xp leaderboard ranks the health-backed user among friends', () async {
-      final source = FakeHealthSource(stats: [day(9, steps: 5000, workout: 10)]);
+      final source = FakeHealthSource(
+        stats: [day(9, steps: 5000, workout: 10)],
+      );
       final r = repo(source);
       await r.connect();
       final board = await r.xpLeaderboard(weekOf: today);
@@ -289,6 +313,128 @@ void main() {
       final source = FakeHealthSource();
       await repo(source).openInstallPage();
       expect(source.openInstallPageCalls, 1);
+    });
+  });
+
+  HealthStatsRepository gatedRepo(
+    GatedFriendsRepository gatedFriends,
+    GatedStatsRepository gatedStats,
+  ) => HealthStatsRepository(
+    source: FakeHealthSource(),
+    fallback: gatedStats,
+    friends: gatedFriends,
+    clock: () => today,
+  );
+
+  group('leaderboard summaries run concurrently', () {
+    test('start every lookup and summary before any finishes, me first, '
+        'skipping unknown ids and me', () async {
+      final friendsGate = Gate();
+      final statsGate = Gate();
+      final gatedFriends = GatedFriendsRepository(friendsGate);
+      final gatedStats = GatedStatsRepository(
+        statsGate,
+        stepsByUser: {mockMe.id: 300, 'u_bree': 500, 'u_alex': 200},
+      );
+      final board = gatedRepo(gatedFriends, gatedStats).leaderboard(
+        StatMetric.steps,
+        weekOf: today,
+        userIds: ['u_bree', 'nobody', 'u_alex', mockMe.id, 'u_bree'],
+      );
+
+      await pumpEventQueue();
+      // Duplicates are dropped, and every lookup is already in flight.
+      expect(gatedFriends.started, ['u_bree', 'nobody', 'u_alex', mockMe.id]);
+      expect(gatedStats.started, isEmpty);
+      // Lookups finish in reverse order.
+      await friendsGate.openReversed();
+
+      await pumpEventQueue();
+      // Me first, then the found users in the order given; all in flight.
+      expect(gatedStats.started, [mockMe.id, 'u_bree', 'u_alex']);
+      // Summaries finish in reverse order but still land on the right people.
+      await statsGate.openReversed();
+
+      final entries = await board;
+      expect(entries.map((e) => e.user.id), ['u_bree', mockMe.id, 'u_alex']);
+      expect(entries.map((e) => e.value), [500, 300, 200]);
+      expect(entries.map((e) => e.rank), [1, 2, 3]);
+      expect(entries.every((e) => e.metric == StatMetric.steps), isTrue);
+    });
+
+    test('without userIds, me then friends are summarised together', () async {
+      final statsGate = Gate();
+      final friendIds = [
+        for (final f in await GatedFriendsRepository(Gate()).friends()) f.id,
+      ];
+      // Friend k gets (k + 2) thousand steps and me 1,000, so everyone has a
+      // different XP and the order is the friends reversed, then me.
+      final steps = {
+        mockMe.id: 1000,
+        for (var i = 0; i < friendIds.length; i++) friendIds[i]: (i + 2) * 1000,
+      };
+      final gatedStats = GatedStatsRepository(statsGate, stepsByUser: steps);
+      final board = gatedRepo(
+        GatedFriendsRepository(Gate()),
+        gatedStats,
+      ).xpLeaderboard(weekOf: today);
+
+      await pumpEventQueue();
+      expect(gatedStats.started, [mockMe.id, ...friendIds]);
+      await statsGate.openReversed();
+
+      final entries = await board;
+      final expectedIds = [...friendIds.reversed, mockMe.id];
+      expect(entries.map((e) => e.user.id), expectedIds);
+      expect(entries.map((e) => e.rank), [
+        for (var i = 1; i <= expectedIds.length; i++) i,
+      ]);
+      expect(entries.map((e) => e.value), [
+        for (final id in expectedIds)
+          dailyXp(
+            DailyStats(userId: id, date: DateTime(2026), steps: steps[id]!),
+          ),
+      ]);
+      expect(entries.every((e) => e.metric == null), isTrue);
+    });
+
+    test('a failing user lookup surfaces its error', () async {
+      final friendsGate = Gate()..open();
+      final r = gatedRepo(
+        GatedFriendsRepository(friendsGate, failIds: {'u_alex'}),
+        GatedStatsRepository(Gate()..open()),
+      );
+      await expectLater(
+        r.leaderboard(
+          StatMetric.steps,
+          weekOf: today,
+          userIds: ['u_bree', 'u_alex'],
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'userById u_alex',
+          ),
+        ),
+      );
+    });
+
+    test('a failing weekly summary surfaces its error', () async {
+      final r = gatedRepo(
+        GatedFriendsRepository(Gate()..open()),
+        GatedStatsRepository(Gate()..open(), failIds: {'u_bree'}),
+      );
+      await expectLater(
+        r.leaderboard(StatMetric.steps, weekOf: today),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'weeklySummary u_bree',
+          ),
+        ),
+      );
     });
   });
 }

@@ -82,6 +82,30 @@ class ManualScreenTimeRepository implements ConnectableStatsRepository {
     return byDate.values.toList()..sort((a, b) => a.date.compareTo(b.date));
   }
 
+  /// Only the current user's real screen time (measured by this phone or
+  /// logged by hand, a logged day winning), as days that carry nothing else.
+  /// Never touches the inner source, so demo or fallback data can't leak in;
+  /// this is what to publish while health isn't connected.
+  Future<List<DailyStats>> ownScreenTimeDays({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final userId = (await _friends.currentUser()).id;
+    final measured = await device.hasAccess()
+        ? await device.dailyMinutes(from: from, to: to)
+        : const <DateTime, int>{};
+    final logged = await log.entries(from: from, to: to);
+    final byDate = {...measured, ...logged};
+    return [
+      for (final date in byDate.keys.toList()..sort())
+        DailyStats(
+          userId: userId,
+          date: date,
+          screenTimeMinutes: byDate[date]!,
+        ),
+    ];
+  }
+
   @override
   Future<WeeklySummary> weeklySummary(String userId, {DateTime? weekOf}) async {
     if (userId != (await _friends.currentUser()).id) {
@@ -119,18 +143,22 @@ class ManualScreenTimeRepository implements ConnectableStatsRepository {
     Iterable<String>? userIds,
   ) async {
     final me = await _friends.currentUser();
-    final others = <UserProfile>[];
+    final List<UserProfile> others;
     if (userIds == null) {
-      others.addAll(await _friends.friends());
+      others = await _friends.friends();
     } else {
-      for (final id in userIds.toSet()) {
-        final user = await _friends.userById(id);
-        if (user != null && user.id != me.id) others.add(user);
-      }
+      final found = await Future.wait([
+        for (final id in userIds.toSet()) _friends.userById(id),
+      ]);
+      others = [
+        for (final user in found)
+          if (user != null && user.id != me.id) user,
+      ];
     }
-    return {
-      for (final p in [me, ...others])
-        p: await weeklySummary(p.id, weekOf: weekOf),
-    };
+    final people = [me, ...others];
+    final summaries = await Future.wait([
+      for (final p in people) weeklySummary(p.id, weekOf: weekOf),
+    ]);
+    return {for (var i = 0; i < people.length; i++) people[i]: summaries[i]};
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -36,6 +37,7 @@ class MyStatsScreen extends StatefulWidget {
     this.clock,
     this.goals = const DailyGoals(),
     this.screenTimeLog,
+    this.onScreenTimeSaved,
     this.deviceScreenTime = const NoDeviceScreenTime(),
   });
 
@@ -51,6 +53,10 @@ class MyStatsScreen extends StatefulWidget {
   /// a button to log it. [stats] should merge these entries back in (see
   /// `ManualScreenTimeRepository`), or the logged value won't show.
   final ScreenTimeLog? screenTimeLog;
+
+  /// Called after a logged screen time is saved, so it can be published to
+  /// friends. Failures are ignored: they never affect the save.
+  final Future<void> Function()? onScreenTimeSaved;
 
   /// Screen time the phone measures. When it's supported but access is off,
   /// Today offers to turn it on. [stats] should read from the same source
@@ -199,6 +205,11 @@ class _MyStatsScreenState extends State<MyStatsScreen>
         const SnackBar(content: Text("Couldn't save that. Try again.")),
       );
       return;
+    }
+    try {
+      unawaited(widget.onScreenTimeSaved?.call().catchError((Object _) {}));
+    } on Object {
+      // Publishing is best effort; the save already succeeded.
     }
     if (!mounted) return;
     setState(() {

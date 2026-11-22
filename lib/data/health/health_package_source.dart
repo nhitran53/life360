@@ -22,6 +22,10 @@ class HealthPackageSource implements HealthSource {
   final Health _health;
   bool _configured = false;
 
+  /// Most days whose platform queries are in flight at once in
+  /// [fetchDailyStats] (each day makes up to two calls).
+  static const maxConcurrentDays = 8;
+
   static const _sleepStageTypes = [
     HealthDataType.SLEEP_ASLEEP,
     HealthDataType.SLEEP_LIGHT,
@@ -144,34 +148,77 @@ class HealthPackageSource implements HealthSource {
       );
     }
 
-    final result = <DailyStats>[];
-    for (
-      var day = first;
-      !day.isAfter(last);
-      day = DateTime(day.year, day.month, day.day + 1)
-    ) {
-      final next = DateTime(day.year, day.month, day.day + 1);
-      final stats = DailyStats(
-        userId: userId,
-        date: day,
-        // Platform aggregates merge overlapping sources (phone plus watch),
-        // so steps and calories are never summed from raw samples here.
-        steps: readable.contains(StatMetric.steps)
-            ? await _health.getTotalStepsInInterval(day, next) ?? 0
-            : 0,
-        activeCalories: readable.contains(StatMetric.calories)
-            ? await _activeCalories(day, next)
-            : 0,
-        sleepMinutes: readable.contains(StatMetric.sleep)
-            ? sleepMinutesForDay(intervals, day)
-            : 0,
-        workoutMinutes: readable.contains(StatMetric.workout)
-            ? workoutMinutesForDay(intervals, day)
-            : 0,
-      );
-      if (_hasData(stats)) result.add(stats);
+    // Days are independent platform queries, so a bounded number run at once
+    // (a long range would otherwise flood the platform channel). Results are
+    // stored by index, so the output stays in date order; the first failure
+    // is rethrown as is.
+    final days = <DateTime>[
+      for (
+        var day = first;
+        !day.isAfter(last);
+        day = DateTime(day.year, day.month, day.day + 1)
+      )
+        day,
+    ];
+    final stats = List<DailyStats?>.filled(days.length, null);
+    var nextIndex = 0;
+    var failed = false;
+    Future<void> worker() async {
+      // After a failure the other workers stop starting new days.
+      while (!failed && nextIndex < days.length) {
+        final index = nextIndex++;
+        try {
+          stats[index] = await _dayStats(
+            userId,
+            days[index],
+            readable: readable,
+            intervals: intervals,
+          );
+        } on Object {
+          failed = true;
+          rethrow;
+        }
+      }
     }
-    return result;
+
+    await Future.wait([
+      for (var i = 0; i < maxConcurrentDays && i < days.length; i++) worker(),
+    ]);
+    return [
+      for (final day in stats)
+        if (_hasData(day!)) day,
+    ];
+  }
+
+  Future<DailyStats> _dayStats(
+    String userId,
+    DateTime day, {
+    required Set<StatMetric> readable,
+    required List<HealthInterval> intervals,
+  }) async {
+    final next = DateTime(day.year, day.month, day.day + 1);
+    // Platform aggregates merge overlapping sources (phone plus watch), so
+    // steps and calories are never summed from raw samples here.
+    final totals = await Future.wait([
+      readable.contains(StatMetric.steps)
+          ? _health.getTotalStepsInInterval(day, next).then((v) => v ?? 0)
+          : Future.value(0),
+      readable.contains(StatMetric.calories)
+          ? _activeCalories(day, next)
+          : Future.value(0),
+    ]);
+    return DailyStats(
+      userId: userId,
+      date: day,
+      steps: totals[0],
+      activeCalories: totals[1],
+      sleepMinutes: readable.contains(StatMetric.sleep)
+          ? sleepMinutesForDay(intervals, day)
+          : 0,
+      workoutMinutes: readable.contains(StatMetric.workout)
+          ? workoutMinutesForDay(intervals, day)
+          : 0,
+    );
   }
 
   bool _hasData(DailyStats s) =>

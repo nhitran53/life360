@@ -111,6 +111,97 @@ void main() {
     },
   );
 
+  group('while health is disconnected, only own screen time is published', () {
+    // Stands in for ManualScreenTimeRepository.ownScreenTimeDays.
+    late List<DailyStats> screenTimeDays;
+
+    StatsSync screenTimeSync() => StatsSync(
+      source: source..connected = false,
+      sharing: sharing,
+      publisher: FirestoreStatsPublisher(db, uid: 'u1', clock: () => now),
+      userId: 'u1',
+      ownScreenTime: (from, to) async => screenTimeDays,
+      clock: () => now,
+    );
+
+    Future<Map<String, dynamic>?> read() async =>
+        (await db.doc('users/u1/daily/2026-03-12').get()).data();
+
+    // Screen time is private by default.
+    Future<void> shareAll() async {
+      await sharing.load();
+      await sharing.update('u1', const SharingSettings(hidden: {}));
+    }
+
+    setUp(() {
+      screenTimeDays = [
+        DailyStats(
+          userId: 'u1',
+          date: DateTime(2026, 3, 12),
+          screenTimeMinutes: 95,
+        ),
+      ];
+    });
+
+    test('publishes screen time and no other metric', () async {
+      await shareAll();
+      await screenTimeSync().sync();
+      final data = (await read())!;
+      expect(data['screenTime'], 95);
+      for (final m in StatMetric.values.where(
+        (m) => m != StatMetric.screenTime,
+      )) {
+        expect(data.containsKey(m.name), isFalse, reason: m.name);
+      }
+    });
+
+    test('never reads the (demo) source', () async {
+      await shareAll();
+      source.fail = true;
+      await screenTimeSync().sync();
+      expect((await read())!['screenTime'], 95);
+    });
+
+    test('hidden screen time publishes nothing', () async {
+      await sharing.load();
+      await sharing.update(
+        'u1',
+        const SharingSettings(hidden: {StatMetric.screenTime}),
+      );
+      await screenTimeSync().sync();
+      expect(await published(), isEmpty);
+    });
+
+    test('paused publishes nothing', () async {
+      await sharing.load();
+      await sharing.update(
+        'u1',
+        const SharingSettings().withPause(now.add(const Duration(days: 1))),
+      );
+      await screenTimeSync().sync();
+      expect(await published(), isEmpty);
+    });
+
+    test('clearing the log takes the published value down', () async {
+      await shareAll();
+      final disconnected = screenTimeSync();
+      await disconnected.sync();
+      expect(await published(), ['2026-03-12']);
+      screenTimeDays = [];
+      await disconnected.sync();
+      expect(await published(), isEmpty);
+    });
+  });
+
+  test('a connected source still publishes all its metrics', () async {
+    await sharing.load();
+    await sync.sync();
+    expect(
+      (await db.doc('users/u1/daily/2026-03-12').get()).data()!['steps'],
+      4000,
+    );
+  });
+
   test('a source that throws leaves published days untouched', () async {
     await sharing.load();
     await sync.sync();

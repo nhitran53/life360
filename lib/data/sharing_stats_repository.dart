@@ -81,16 +81,20 @@ class SharingStatsRepository implements ConnectableStatsRepository {
     required DateTime from,
     required DateTime to,
   }) async {
+    final isMe = await _isMe(userId);
     final days = await inner.dailyStats(userId, from: from, to: to);
-    if (await _isMe(userId)) return days;
+    if (isMe) return days;
     final hidden = _hiddenFor(userId);
     return [for (final d in days) maskStats(d, hidden)];
   }
 
   @override
   Future<WeeklySummary> weeklySummary(String userId, {DateTime? weekOf}) async {
+    // Decide who this is before reading, so the settings are looked up right
+    // as the read finishes, with nothing awaited in between.
+    final isMe = await _isMe(userId);
     final week = await inner.weeklySummary(userId, weekOf: weekOf);
-    if (await _isMe(userId)) return week;
+    if (isMe) return week;
     final hidden = _hiddenFor(userId);
     if (hidden.isEmpty) return week;
     return WeeklySummary.fromDays(
@@ -134,21 +138,27 @@ class SharingStatsRepository implements ConnectableStatsRepository {
   Future<List<UserProfile>> _people(Iterable<String>? userIds) async {
     final me = await friends.currentUser();
     if (userIds == null) return [me, ...await friends.friends()];
-    final others = <UserProfile>[];
-    for (final id in userIds.toSet()) {
-      final user = await friends.userById(id);
-      if (user != null && user.id != me.id) others.add(user);
-    }
-    return [me, ...others];
+    final found = await Future.wait([
+      for (final id in userIds.toSet()) friends.userById(id),
+    ]);
+    return [
+      me,
+      for (final user in found)
+        if (user != null && user.id != me.id) user,
+    ];
   }
 
   /// Unmasked summaries: ranking needs the real value of the shared metric.
   Future<Map<UserProfile, WeeklySummary>> _summaries(
     Iterable<UserProfile> people,
     DateTime? weekOf,
-  ) async => {
-    for (final p in people) p: await inner.weeklySummary(p.id, weekOf: weekOf),
-  };
+  ) async {
+    final list = people.toList();
+    final summaries = await Future.wait([
+      for (final p in list) inner.weeklySummary(p.id, weekOf: weekOf),
+    ]);
+    return {for (var i = 0; i < list.length; i++) list[i]: summaries[i]};
+  }
 }
 
 /// [d] with every metric in [hidden] set to 0.

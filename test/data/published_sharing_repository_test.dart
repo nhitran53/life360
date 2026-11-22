@@ -23,7 +23,10 @@ void main() {
   });
 
   test('a recorded friend shares exactly the published metrics', () {
-    repo.record('friend', {StatMetric.sleep, StatMetric.steps});
+    repo.record('friend', {
+      StatMetric.sleep,
+      StatMetric.steps,
+    }, repo.startLookup());
     final settings = repo.settingsFor('friend');
     expect(settings.isShared(StatMetric.sleep, now), isTrue);
     expect(settings.isShared(StatMetric.steps, now), isTrue);
@@ -32,7 +35,7 @@ void main() {
   });
 
   test('a friend with nothing published reads as paused and hides all', () {
-    repo.record('friend', const {});
+    repo.record('friend', const {}, repo.startLookup());
     final settings = repo.settingsFor('friend');
     expect(settings.isPaused(now), isTrue);
     for (final m in StatMetric.values) {
@@ -40,10 +43,26 @@ void main() {
     }
   });
 
-  test('a later record replaces the earlier one', () {
-    repo.record('friend', {StatMetric.sleep});
-    repo.record('friend', {StatMetric.steps});
-    expect(repo.settingsFor('friend').isShared(StatMetric.sleep, now), isFalse);
+  test('a lookup that started later replaces an earlier one', () {
+    final first = repo.startLookup();
+    final second = repo.startLookup();
+    repo.record('friend', {StatMetric.sleep}, first);
+    repo.record('friend', {StatMetric.steps}, second);
+    final settings = repo.settingsFor('friend');
+    expect(settings.isShared(StatMetric.sleep, now), isFalse);
+    expect(settings.isShared(StatMetric.steps, now), isTrue);
+  });
+
+  test('a lookup that started earlier but finished later is ignored', () {
+    final first = repo.startLookup();
+    final second = repo.startLookup();
+    repo.record('friend', {StatMetric.steps}, second);
+    repo.record('friend', {StatMetric.sleep}, first);
+    repo.record('friend', const {}, first);
+    final settings = repo.settingsFor('friend');
+    expect(settings.isShared(StatMetric.steps, now), isTrue);
+    expect(settings.isShared(StatMetric.sleep, now), isFalse);
+    expect(settings.isPaused(now), isFalse);
   });
 
   test('update and listeners go through to the inner repository', () async {

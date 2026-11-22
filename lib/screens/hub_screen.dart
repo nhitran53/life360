@@ -38,6 +38,7 @@ Widget _myStats(AppServices s) =>
       friends: s.friends,
       stats: s.stats,
       screenTimeLog: s.screenTime,
+      onScreenTimeSaved: s.syncNow,
       deviceScreenTime: s.deviceScreenTime,
     );
 

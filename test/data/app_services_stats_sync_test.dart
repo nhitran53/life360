@@ -51,6 +51,47 @@ void main() {
   });
 
   test(
+    'logging screen time without health connected publishes only it',
+    () async {
+      final sharing = MockSharingRepository(initial: {});
+      final services = AppServices.defaults(
+        friends: MockFriendsRepository(),
+        sharing: sharing,
+        statsDb: db,
+        userId: mockMe.id,
+      );
+      addTearDown(services.dispose);
+      // Screen time is private by default.
+      await sharing.update(mockMe.id, const SharingSettings(hidden: {}));
+      await pumpEventQueue();
+      expect(await published(), isEmpty);
+
+      await services.screenTime.setMinutes(DateTime.now(), 90);
+      await services.syncNow();
+
+      final docs = (await db.collection('users/${mockMe.id}/daily').get()).docs;
+      expect(docs, hasLength(1));
+      final data = docs.single.data();
+      expect(data['screenTime'], 90);
+      for (final m in StatMetric.values.where(
+        (m) => m != StatMetric.screenTime,
+      )) {
+        expect(data.containsKey(m.name), isFalse, reason: m.name);
+      }
+    },
+  );
+
+  test('syncNow does nothing without a Firestore session', () async {
+    final services = AppServices.defaults(
+      friends: MockFriendsRepository(),
+      sharing: MockSharingRepository(initial: {}),
+    );
+    addTearDown(services.dispose);
+    await services.syncNow();
+    expect(await published(), isEmpty);
+  });
+
+  test(
     'no Firestore session: nothing is published and friends stay mock',
     () async {
       final services = AppServices.defaults(
