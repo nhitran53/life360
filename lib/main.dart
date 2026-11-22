@@ -11,6 +11,7 @@ import 'data/firebase_auth_repository.dart';
 import 'data/firestore_friends_repository.dart';
 import 'data/firestore_profile_repository.dart';
 import 'data/firestore_sharing_repository.dart';
+import 'data/local_account_store.dart';
 import 'firebase_options.dart';
 import 'data/mock_auth_repository.dart';
 import 'data/mock_profile_repository.dart';
@@ -29,17 +30,19 @@ Future<void> main() async {
   runApp(Friend360App(session: await _firebaseSession()));
 }
 
-/// Real accounts through Firebase, or null (mock accounts) on platforms
-/// that aren't set up in Firebase yet. Run `flutterfire configure` to add
-/// one: it updates lib/firebase_options.dart.
-Future<AccountSession?> _firebaseSession() async {
+/// Real accounts through Firebase, or local accounts saved on the device
+/// on platforms that aren't set up in Firebase yet. Run
+/// `flutterfire configure` to add one: it updates lib/firebase_options.dart.
+Future<AccountSession> _firebaseSession() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } on UnsupportedError {
-    debugPrint('Firebase is not set up for this platform: using mock accounts');
-    return null;
+    debugPrint(
+      'Firebase is not set up for this platform: using local accounts',
+    );
+    return _localSession();
   }
   final db = FirebaseFirestore.instance;
   return AccountSession(
@@ -52,6 +55,16 @@ Future<AccountSession?> _firebaseSession() async {
       unawaited(sharing.load());
       return sharing;
     },
+  );
+}
+
+/// Mock accounts kept on the device, so signing up once is enough: you stay
+/// signed in after closing the app.
+Future<AccountSession> _localSession() async {
+  final store = SharedPreferencesLocalAccountStore();
+  return AccountSession(
+    auth: await MockAuthRepository.persistent(store),
+    profiles: await MockProfileRepository.persistent(store),
   );
 }
 
@@ -68,10 +81,10 @@ class Friend360App extends StatefulWidget {
 class _Friend360AppState extends State<Friend360App> {
   late final AccountSession _session =
       widget.session ??
-          (_ownSession = AccountSession(
-            auth: MockAuthRepository(),
-            profiles: MockProfileRepository(),
-          ));
+      (_ownSession = AccountSession(
+        auth: MockAuthRepository(),
+        profiles: MockProfileRepository(),
+      ));
   AccountSession? _ownSession;
 
   @override
@@ -164,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 12),
                     Text(
                       'Share your steps, sleep and screen time.\n'
-                          'See who wins the week.',
+                      'See who wins the week.',
                       textAlign: TextAlign.center,
                       style: text.bodyLarge?.copyWith(color: AppColors.inkSoft),
                     ),
