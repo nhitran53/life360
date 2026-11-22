@@ -58,6 +58,32 @@ void main() {
     expect(days[1].workoutMinutes, 20);
   });
 
+  test('on a Sunday afternoon, today still counts as this week', () async {
+    final sunday = DateTime(2026, 3, 15, 13, 30);
+    final published = PublishedSharingRepository(MockSharingRepository());
+    final sundayRepo = FirestoreStatsRepository(
+      db,
+      own: own,
+      friends: friends,
+      published: published,
+      clock: () => sunday,
+    );
+    await put('u_alex', '2026-03-15', {'steps': 4000, 'sleep': 420});
+
+    final days = await sundayRepo.dailyStats(
+      'u_alex',
+      from: sunday,
+      to: sunday,
+    );
+
+    expect(days.single.sleepMinutes, 420);
+    expect(published.hasRecorded('u_alex'), isTrue);
+    expect(
+      published.settingsFor('u_alex').isShared(StatMetric.sleep, sunday),
+      isTrue,
+    );
+  });
+
   test('a metric the friend did not publish reads as 0', () async {
     await put('u_alex', '2026-03-11', {'steps': 7000});
     final day = (await repo.dailyStats(

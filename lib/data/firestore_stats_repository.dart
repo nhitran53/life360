@@ -53,7 +53,11 @@ class FirestoreStatsRepository implements StatsRepository {
     // A window wholly in the future is empty whatever the friend shares.
     // If what the friend shares now can't be learned, show nothing rather
     // than mask by an allow-list the friend may have since narrowed.
-    if (!from.isAfter(_currentWeekEnd()) && !await _learnCurrentWeek(userId)) {
+    // Compare calendar days: [from] can carry a time of day, and the week
+    // end is midnight on Sunday, so "now" on a Sunday would look like the
+    // future and skip the lookup.
+    if (!dateOnly(from).isAfter(_currentWeekEnd()) &&
+        !await _learnCurrentWeek(userId)) {
       return const [];
     }
     return days.days;
