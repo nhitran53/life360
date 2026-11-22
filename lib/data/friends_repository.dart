@@ -21,6 +21,16 @@ abstract interface class FriendsRepository {
   /// Empty for queries shorter than 2 characters.
   Future<List<UserProfile>> searchUsers(String query);
 
+  /// Looks up a user by the exact email they signed up with
+  /// (case-insensitive). Null if nobody has it. There's no partial email
+  /// search, so nobody can browse other people's emails.
+  Future<UserProfile?> findByEmail(String email);
+
+  /// People to suggest inviting: never you, your friends, or anyone you
+  /// already have a pending request with. Newest accounts first, at most
+  /// [limit].
+  Future<List<UserProfile>> suggestions({int limit = 8});
+
   /// Looks up any known user by id. Null if none.
   Future<UserProfile?> userById(String userId);
 

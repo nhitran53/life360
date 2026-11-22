@@ -10,6 +10,10 @@ import 'profile_repository.dart';
 /// Layout (see firestore.rules):
 /// - `users/{uid}`: public profile (name, @username, avatar, friend code)
 /// - `users/{uid}/private/goals`: daily goals, only the owner can read them
+/// - `users/{uid}/private/account`: the sign-in email, only the owner can
+///   read it
+/// - `emails/{email}`: `{uid}` so friends can find you by your exact email.
+///   It can be fetched one at a time but never listed.
 /// - `users/{uid}/private/settings`: sharing settings (see
 ///   FirestoreSharingRepository), deleted along with the profile
 /// - `friendships/...`: deleted along with the profile (see
@@ -33,6 +37,10 @@ class FirestoreProfileRepository implements ProfileRepository {
       _user(uid).collection('private').doc('goals');
   DocumentReference<Map<String, dynamic>> _sharing(String uid) =>
       _user(uid).collection('private').doc('settings');
+  DocumentReference<Map<String, dynamic>> _account(String uid) =>
+      _user(uid).collection('private').doc('account');
+  DocumentReference<Map<String, dynamic>> _emailClaim(String email) =>
+      _db.collection('emails').doc(email);
   DocumentReference<Map<String, dynamic>> _username(String username) =>
       _db.collection('usernames').doc(username);
   DocumentReference<Map<String, dynamic>> _friendCode(String code) =>
@@ -107,8 +115,25 @@ class FirestoreProfileRepository implements ProfileRepository {
       _goals(uid).set(goals.toJson());
 
   @override
+  Future<void> saveEmail(String uid, String email) async {
+    final normalized = normalizeEmail(email);
+    if (!looksLikeEmail(normalized)) return;
+    await (_db.batch()
+          ..set(_account(uid), {'email': normalized})
+          ..set(_emailClaim(normalized), {'uid': uid}))
+        .commit();
+  }
+
+  @override
+  Future<String?> emailFor(String uid) async {
+    final email = (await _account(uid).get()).data()?['email'];
+    return email is String ? email : null;
+  }
+
+  @override
   Future<void> deleteProfile(String uid) async {
     final profile = await profileFor(uid);
+    final email = await emailFor(uid);
     // Friendships and requests go too, so you vanish from friends' lists.
     final friendships = await _db
         .collection('friendships')
@@ -118,7 +143,9 @@ class FirestoreProfileRepository implements ProfileRepository {
     final daily = await _user(uid).collection('daily').get();
     final batch = _db.batch()
       ..delete(_goals(uid))
-      ..delete(_sharing(uid));
+      ..delete(_sharing(uid))
+      ..delete(_account(uid));
+    if (email != null) batch.delete(_emailClaim(email));
     for (final d in daily.docs) {
       batch.delete(d.reference);
     }

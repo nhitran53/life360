@@ -74,6 +74,10 @@ String? displayNameProblem(String displayName) {
   return null;
 }
 
+/// " Alex@Mail.com " → "alex@mail.com". Emails are stored and looked up
+/// like this.
+String normalizeEmail(String email) => email.trim().toLowerCase();
+
 /// Very loose check: something@something.something. The auth backend does
 /// the real validation.
 bool looksLikeEmail(String email) =>

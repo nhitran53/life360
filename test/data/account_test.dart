@@ -188,6 +188,21 @@ void main() {
       expect(session.goals.steps, 10000);
     });
 
+    test('saves the sign-in email once there is a profile', () async {
+      await auth.signUpWithEmail('Nhi@Example.com', 'password1');
+      await settle();
+      expect(await profiles.emailFor(auth.currentUser!.uid), isNull);
+
+      await session.completeOnboarding(
+        displayName: 'Nhi',
+        username: 'nhi',
+        avatarEmoji: '🦊',
+        goals: const DailyGoals(),
+      );
+      await settle();
+      expect(await profiles.emailFor(auth.currentUser!.uid), 'nhi@example.com');
+    });
+
     test('builds real friends for the signed-in profile only', () async {
       final made = <String>[];
       final withFriends = AccountSession(

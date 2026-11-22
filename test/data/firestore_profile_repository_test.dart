@@ -110,4 +110,35 @@ void main() {
     );
     expect(await repo.isUsernameAvailable('nhi'), isTrue);
   });
+
+  test(
+    'saveEmail stores it privately with a lookup, and delete frees both',
+    () async {
+      await createNhi();
+      await repo.saveEmail('u1', ' Nhi@Example.com ');
+      await repo.saveEmail('u1', 'nhi@example.com'); // again is fine
+
+      expect((await db.doc('users/u1/private/account').get()).data(), {
+        'email': 'nhi@example.com',
+      });
+      expect((await db.doc('emails/nhi@example.com').get()).data(), {
+        'uid': 'u1',
+      });
+      expect(await repo.emailFor('u1'), 'nhi@example.com');
+      // Not on the public profile, which every signed-in user can read.
+      expect(
+        (await db.doc('users/u1').get()).data()!.containsKey('email'),
+        isFalse,
+      );
+
+      await repo.deleteProfile('u1');
+      expect((await db.doc('users/u1/private/account').get()).exists, isFalse);
+      expect((await db.doc('emails/nhi@example.com').get()).exists, isFalse);
+    },
+  );
+
+  test('saveEmail ignores something that is not an email', () async {
+    await repo.saveEmail('u1', 'not-an-email');
+    expect(await repo.emailFor('u1'), isNull);
+  });
 }
