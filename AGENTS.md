@@ -50,7 +50,7 @@ Principles:
 
 - **Bright, flat colors** on a clean white/light background. Use one strong primary green and bold accent colors. Avoid heavy gradients and neon glows. *(The current home/hub screens use pink/purple gradients and will be rethemed, see the issues.)*
 - **Chunky "3D" buttons and cards**: rounded corners (16–20px), a solid darker bottom border (~4px) that looks like depth, and a press animation where the button moves down and the border shrinks.
-- **Rounded, heavy typography**: a rounded sans such as **Nunito** (Google Fonts) in weights 700–900. Headings should be big and bold.
+- **Clean, confident typography**: **Plus Jakarta Sans** (bundled in `assets/fonts`, weights 500–800). Bold headings, semibold labels, medium body text.
 - **Celebrate progress**: confetti or a bounce when a goal is hit, streak flames 🔥, XP counters that tick up, badges.
 - **Friendly copy**: short and encouraging, with a little cheek ("You're 2,000 steps behind Alex 👀"). Never shame users about sleep or health.
 - **Mascot**: an original character (TBD) that reacts to your progress.

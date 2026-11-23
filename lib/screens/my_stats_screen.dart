@@ -327,9 +327,8 @@ class _HeaderChips extends StatelessWidget {
         Expanded(
           child: _HeaderChip(
             key: const ValueKey('streak'),
-            emoji: '🔥',
+            icon: Icons.local_fire_department_rounded,
             color: AppColors.orange,
-            edge: AppColors.orangeDark,
             value: streak,
             format: (n) => '$n',
             caption: 'day streak',
@@ -340,9 +339,8 @@ class _HeaderChips extends StatelessWidget {
         Expanded(
           child: _HeaderChip(
             key: const ValueKey('xp'),
-            emoji: '⚡',
-            color: AppColors.gold,
-            edge: AppColors.goldDark,
+            icon: Icons.bolt_rounded,
+            color: AppColors.goldDark,
             value: weekXp,
             format: formatThousands,
             caption: 'XP this week',
@@ -354,21 +352,22 @@ class _HeaderChips extends StatelessWidget {
   }
 }
 
+/// A white stat tile: the color lives only in the icon, the number stays ink.
 class _HeaderChip extends StatelessWidget {
   const _HeaderChip({
     super.key,
-    required this.emoji,
+    required this.icon,
     required this.color,
-    required this.edge,
     required this.value,
     required this.format,
     required this.caption,
     required this.semanticLabel,
   });
 
-  final String emoji;
+  final IconData icon;
+
+  /// Icon color; a soft tint of it fills the circle behind the icon.
   final Color color;
-  final Color edge;
   final int value;
   final String Function(int) format;
   final String caption;
@@ -384,14 +383,23 @@ class _HeaderChip extends StatelessWidget {
       label: semanticLabel,
       child: ExcludeSemantics(
         child: ChunkySurface(
-          color: color,
-          edgeColor: edge,
+          color: AppColors.surface,
+          edgeColor: AppColors.borderDark,
+          borderColor: AppColors.border,
           radius: AppRadius.card,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 28)),
-              const SizedBox(width: 8),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,7 +414,7 @@ class _HeaderChip extends StatelessWidget {
                       builder: (context, v, _) => Text(
                         format(v.round()),
                         style: text.headlineMedium?.copyWith(
-                          color: Colors.white,
+                          color: AppColors.ink,
                           height: 1.1,
                         ),
                       ),
@@ -414,7 +422,7 @@ class _HeaderChip extends StatelessWidget {
                     Text(
                       caption,
                       overflow: TextOverflow.ellipsis,
-                      style: text.labelMedium?.copyWith(color: Colors.white),
+                      style: text.labelMedium?.copyWith(color: AppColors.inkSoft),
                     ),
                   ],
                 ),
