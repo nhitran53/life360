@@ -12,8 +12,17 @@
         "lib/firebase_options.dart": {
           "projectId": "life360-5e83d",
           "configurations": {
-            "android": "1:386988844410:android:2ecf63e66b386291e8e2c3"
+            "android": "1:386988844410:android:2ecf63e66b386291e8e2c3",
+            "ios": "1:386988844410:ios:c5f31e92a952ef3fe8e2c3"
           }
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "life360-5e83d",
+          "appId": "1:386988844410:ios:c5f31e92a952ef3fe8e2c3",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
       }
     }

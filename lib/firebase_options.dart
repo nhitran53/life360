@@ -26,10 +26,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -58,5 +55,15 @@ class DefaultFirebaseOptions {
     messagingSenderId: '386988844410',
     projectId: 'life360-5e83d',
     storageBucket: 'life360-5e83d.firebasestorage.app',
+  );
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyDLBz8DvfQSKUbWe3HdGxooWNlQ3HC-N-g',
+    appId: '1:386988844410:ios:c5f31e92a952ef3fe8e2c3',
+    messagingSenderId: '386988844410',
+    projectId: 'life360-5e83d',
+    storageBucket: 'life360-5e83d.firebasestorage.app',
+    androidClientId: '386988844410-go3qgrh02akl121cn19l58ib834qnivq.apps.googleusercontent.com',
+    iosClientId: '386988844410-lrfiula2svugblgn2tfel7rljcrmk2j5.apps.googleusercontent.com',
+    iosBundleId: 'com.nhitran.life360',
   );
 }
