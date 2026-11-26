@@ -384,7 +384,7 @@ class _InvitePeopleSheetState extends State<InvitePeopleSheet> {
       onPressed: busy ? null : () => _invite(user),
       style: FilledButton.styleFrom(
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.onPrimary,
         minimumSize: const Size(88, 40),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
@@ -393,7 +393,7 @@ class _InvitePeopleSheetState extends State<InvitePeopleSheet> {
               dimension: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Colors.white,
+                color: AppColors.onPrimary,
               ),
             )
           : const Text('Invite'),

@@ -16,7 +16,7 @@ Target users are friend groups and classmates who want light, fun accountability
 
 ## Tech stack
 
-- **Flutter** (Dart SDK `^3.13.5`), Material 3. Targets: iOS and Android first. Web and desktop folders exist but are not priorities.
+- **Flutter** (Dart SDK `^3.13.0`; any Flutter with Dart 3.13 works), Material 3. Targets: iOS and Android first. Web and desktop folders exist but are not priorities.
 - Firebase Auth and Firestore are used for accounts, profiles, friends, saved sharing settings and published daily stats (`users/{uid}/daily/{date}`, readable by accepted friends; writes are checked against the owner's saved settings, see `firestore.rules`); Firebase is set up for Android only so far. Circles are still mock data, and other platforms fall back to mock accounts.
 - Planned health data: the [`health`](https://pub.dev/packages/health) package (HealthKit + Health Connect) and the Fitbit Web API (OAuth) as an optional extra source.
 
@@ -25,9 +25,9 @@ Target users are friend groups and classmates who want light, fun accountability
 ```
 lib/
   main.dart         # App entry (Friend360App) + animated HomeScreen ("ENTER THE ARENA")
-  screens/          # one file per screen (hub_screen.dart: the menu of main screens)
+  screens/          # one file per screen (circle_screen.dart: the signed-in home)
 test/
-  widget_test.dart  # Widget tests for home → hub navigation
+  widget_test.dart  # Widget tests for welcome → sign-in and Circle home navigation
 ```
 
 As the app grows, move toward this structure (don't do it all at once, only when touching the code):
@@ -100,7 +100,7 @@ Each stat should keep the same color everywhere (sleep is always blue, screen ti
   flutter test
   ```
   All three must pass.
-- Add or update widget tests in `test/` when you add or change a screen. Existing tests check that the home → hub navigation works, so keep them green.
+- Add or update widget tests in `test/` when you add or change a screen. Existing tests check the welcome → sign-in and Circle home navigation, so keep them green.
 - **Use mock data first.** Build screens against a fake repository (`data/mock_*.dart`) so UI work doesn't wait on the backend or health integrations. Put the data source behind an interface so it can be swapped later.
 - Keep widgets small. Private widgets (`_Foo`) are fine inside a screen file. Move them to `widgets/` once two screens share them.
 - Use `withValues(alpha: …)` rather than the deprecated `withOpacity`.

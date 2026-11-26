@@ -502,7 +502,7 @@ class _ViewToggle extends StatelessWidget {
                     _labels[view]!,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: view == selected
-                          ? Colors.white
+                          ? AppColors.onPrimary
                           : AppColors.inkSoft,
                     ),
                   ),

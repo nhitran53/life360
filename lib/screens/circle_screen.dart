@@ -355,7 +355,7 @@ class _CircleLink extends StatelessWidget {
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 19, color: Colors.white),
+                child: Icon(icon, size: 19, color: AppColors.onPrimary),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -515,76 +515,84 @@ class _TogetherToday extends StatelessWidget {
       color: CircleColors.secondary,
     );
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: CircleColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primarySoft, width: _outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Flexible(
-                child: Text(
-                  'Together today',
-                  style: label,
-                  overflow: TextOverflow.ellipsis,
+    return Semantics(
+      container: true,
+      label:
+          'Together today: ${formatNumber(steps)} of '
+          '${formatNumber(goal)} steps, '
+          '${steps >= goal ? 'goal hit' : '${(progress * 100).round()}%'}',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: CircleColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.primarySoft, width: _outline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Flexible(
+                  child: Text(
+                    'Together today',
+                    style: label,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text('Goal ${formatNumber(goal)}', style: label),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                formatNumber(steps),
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: CircleColors.ink,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  'steps · ${(progress * 100).round()}%',
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 8),
+                Text('Goal ${formatNumber(goal)}', style: label),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  formatNumber(steps),
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 26,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.primaryText,
+                    color: CircleColors.ink,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'steps · ${(progress * 100).round()}%',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              height: 12,
+              decoration: BoxDecoration(
+                color: AppColors.primaryTint,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: progress,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(6),
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            height: 12,
-            decoration: BoxDecoration(
-              color: AppColors.primaryTint,
-              borderRadius: BorderRadius.circular(6),
             ),
-            alignment: Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: progress,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

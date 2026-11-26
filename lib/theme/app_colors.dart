@@ -52,4 +52,10 @@ abstract final class AppColors {
 
   /// Edge color for neutral (white) chunky cards and buttons.
   static const borderDark = Color(0xFFD9D9D5);
+
+  /// Text and icons on colored fills (primary buttons, stat badges).
+  static const onPrimary = Color(0xFFFFFFFF);
+
+  /// Edge under dark [ink] buttons, e.g. Sign in with Apple.
+  static const inkDark = Color(0xFF000000);
 }

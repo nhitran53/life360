@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../theme/app_colors.dart';
 import '../utils/platform_support.dart';
 import '../widgets/chunky.dart';
+import '../widgets/practice_mode_note.dart';
 
 // ---------------------------------------------------------------------------
 // SIGN IN — create an account or log in with email, Google or Apple.
@@ -42,6 +43,9 @@ class _SignInScreenState extends State<SignInScreen> {
   bool get _signUp => _mode == SignInMode.signUp;
 
   bool get _showApple => widget.showApple ?? offersAppleSignIn;
+
+  /// Local accounts only: Google and Apple would just make a fake account.
+  bool get _practice => AccountScope.maybeOf(context)?.practiceMode ?? false;
 
   @override
   void dispose() {
@@ -136,6 +140,10 @@ class _SignInScreenState extends State<SignInScreen> {
                     : 'Log in to pick up where you left off.',
                 style: text.bodyMedium?.copyWith(color: AppColors.inkSoft),
               ),
+              if (_practice) ...[
+                const SizedBox(height: 16),
+                const PracticeModeNote(),
+              ],
               const SizedBox(height: 24),
               Form(
                 key: _formKey,
@@ -210,27 +218,29 @@ class _SignInScreenState extends State<SignInScreen> {
                     : 'Log in',
                 onPressed: _busy ? null : _submitEmail,
               ),
-              const SizedBox(height: 20),
-              const _OrDivider(),
-              const SizedBox(height: 20),
-              if (_showApple) ...[
-                ChunkyButton(
-                  label: 'Continue with Apple',
-                  icon: Icons.apple,
-                  color: AppColors.ink,
-                  edgeColor: Colors.black,
+              if (!_practice) ...[
+                const SizedBox(height: 20),
+                const _OrDivider(),
+                const SizedBox(height: 20),
+                if (_showApple) ...[
+                  ChunkyButton(
+                    label: 'Continue with Apple',
+                    icon: Icons.apple,
+                    color: AppColors.ink,
+                    edgeColor: AppColors.inkDark,
+                    onPressed: _busy
+                        ? null
+                        : () => _run((a) => a.signInWithApple()),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                ChunkyButton.secondary(
+                  label: 'Continue with Google',
                   onPressed: _busy
                       ? null
-                      : () => _run((a) => a.signInWithApple()),
+                      : () => _run((a) => a.signInWithGoogle()),
                 ),
-                const SizedBox(height: 12),
               ],
-              ChunkyButton.secondary(
-                label: 'Continue with Google',
-                onPressed: _busy
-                    ? null
-                    : () => _run((a) => a.signInWithGoogle()),
-              ),
               const SizedBox(height: 24),
               Center(
                 child: TextButton(

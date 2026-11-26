@@ -446,6 +446,51 @@ void main() {
       expect(session.status, AccountStatus.needsProfile);
     });
 
+    test('a refused login delete is remembered as unfinished', () async {
+      await signUpAndOnboard();
+      expect(session.deleteUnfinished, isFalse);
+      auth.refuseDelete = true;
+
+      await expectLater(session.deleteAccount(), throwsA(isA<AuthException>()));
+      expect(session.deleteUnfinished, isTrue);
+
+      // Trying again from onboarding finishes the job.
+      auth.refuseDelete = false;
+      await session.deleteAccount();
+      await settle();
+      expect(session.status, AccountStatus.signedOut);
+      expect(session.deleteUnfinished, isFalse);
+    });
+
+    test('signing out forgets an unfinished delete', () async {
+      await signUpAndOnboard();
+      auth.refuseDelete = true;
+      await expectLater(session.deleteAccount(), throwsA(isA<AuthException>()));
+
+      await session.signOut();
+      await settle();
+      expect(session.deleteUnfinished, isFalse);
+    });
+
+    test('a failed data delete is not an unfinished delete', () async {
+      await signUpAndOnboard();
+      profiles.failDelete = true;
+
+      await expectLater(session.deleteAccount(), throwsA(isA<Exception>()));
+      expect(session.deleteUnfinished, isFalse);
+    });
+
+    test('a profile-less login can be deleted', () async {
+      await auth.signUpWithEmail('new@example.com', 'password1');
+      await settle();
+      expect(session.status, AccountStatus.needsProfile);
+
+      await session.deleteAccount();
+      await settle();
+      expect(session.status, AccountStatus.signedOut);
+      expect(auth.currentUser, isNull);
+    });
+
     test('a failed data delete keeps the account as it was', () async {
       final uid = await signUpAndOnboard();
       profiles.failDelete = true;

@@ -25,78 +25,102 @@ class _PulseMap extends StatelessWidget {
         (member: members[i], spot: _spots[i]),
     ];
 
-    return Container(
-      height: 248,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.primary, width: _outline + 0.5),
-      ),
-      alignment: Alignment.center,
-      child: SizedBox(
-        width: 342,
+    // One label instead of a pile of initials and badges. Heart rates are
+    // left out: they're made up until #66 is decided.
+    final spoken = [
+      'You',
+      for (final (:member, spot: _) in placed)
+        member.idle
+            ? '${member.name}, ${member.idleFor == null ? 'idle' : 'idle for ${member.idleFor}'}'
+            : member.name,
+    ];
+
+    return Semantics(
+      container: true,
+      label: 'Family map: ${spoken.join(', ')}',
+      excludeSemantics: true,
+      child: Container(
         height: 248,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            _svgAt('ring_outer', left: 63, top: 16, size: 216),
-            _svgAt('ring_middle', left: 99, top: 52, size: 144),
-            _svgAt('ring_inner', left: 135, top: 88, size: 72),
-            // Soft red glow behind anyone with a high heart rate.
-            for (final (:member, :spot) in placed)
-              if (member.highHeartRate) ...[
-                _svgAt('glow_outer',
-                    left: spot.dx - 8, top: spot.dy - 6, size: 68),
-                _svgAt('glow_inner', left: spot.dx, top: spot.dy + 2, size: 52),
-              ],
-            const Positioned(
-              left: 145,
-              top: 92,
-              child: _MapMember(
-                initial: 'You',
-                color: CircleColors.avatarYou,
-                size: 52,
-                badge: _HeartBadge(bpm: circleYouBpm),
-              ),
-            ),
-            for (final (:member, :spot) in placed)
-              Positioned(
-                left: spot.dx,
-                top: spot.dy,
-                child: _MapMember(
-                  initial: member.initial,
-                  color: member.color,
-                  ringColor: member.highHeartRate
-                      ? CircleColors.alert
-                      : member.idle
-                      ? CircleColors.idle
-                      : AppColors.primarySoft,
-                  badge: member.idle
-                      ? _TextBadge(
-                    text: member.idleFor == null
-                        ? 'idle'
-                        : 'idle ${member.idleFor}',
-                  )
-                      : _HeartBadge(
-                    bpm: member.bpm,
-                    alert: member.highHeartRate,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.primarySoft,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.primary, width: _outline + 0.5),
+        ),
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: 342,
+          height: 248,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              _svgAt('ring_outer', left: 63, top: 16, size: 216),
+              _svgAt('ring_middle', left: 99, top: 52, size: 144),
+              _svgAt('ring_inner', left: 135, top: 88, size: 72),
+              // Soft red glow behind anyone with a high heart rate.
+              for (final (:member, :spot) in placed)
+                if (member.highHeartRate) ...[
+                  _svgAt(
+                    'glow_outer',
+                    left: spot.dx - 8,
+                    top: spot.dy - 6,
+                    size: 68,
                   ),
+                  _svgAt(
+                    'glow_inner',
+                    left: spot.dx,
+                    top: spot.dy + 2,
+                    size: 52,
+                  ),
+                ],
+              const Positioned(
+                left: 145,
+                top: 92,
+                child: _MapMember(
+                  initial: 'You',
+                  color: CircleColors.avatarYou,
+                  size: 52,
+                  badge: _HeartBadge(bpm: circleYouBpm),
                 ),
               ),
-            const Positioned(left: 178, top: 213, child: _LiveChip()),
-          ],
+              for (final (:member, :spot) in placed)
+                Positioned(
+                  left: spot.dx,
+                  top: spot.dy,
+                  child: _MapMember(
+                    initial: member.initial,
+                    color: member.color,
+                    ringColor: member.highHeartRate
+                        ? CircleColors.alert
+                        : member.idle
+                        ? CircleColors.idle
+                        : AppColors.primarySoft,
+                    badge: member.idle
+                        ? _TextBadge(
+                            text: member.idleFor == null
+                                ? 'idle'
+                                : 'idle ${member.idleFor}',
+                          )
+                        : _HeartBadge(
+                            bpm: member.bpm,
+                            alert: member.highHeartRate,
+                          ),
+                  ),
+                ),
+              const Positioned(left: 178, top: 213, child: _LiveChip()),
+            ],
+          ),
         ),
       ),
     );
   }
 
   static Widget _svgAt(
-      String name, {
-        required double left,
-        required double top,
-        required double size,
-      }) {
+    String name, {
+    required double left,
+    required double top,
+    required double size,
+  }) {
     return Positioned(
       left: left,
       top: top,
@@ -167,7 +191,7 @@ class _HeartBadge extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w800,
-            color: alert ? Colors.white : CircleColors.heart,
+            color: alert ? AppColors.onPrimary : CircleColors.heart,
           ),
         ),
       ],

@@ -1,45 +1,54 @@
 import 'package:flutter/material.dart';
 
+import 'app_colors.dart';
+
 /// Colors from the "Circle (home)" Figma frame.
 class CircleColors {
   CircleColors._();
 
-  static const background = Color(0xFFF6F5F1);
-  static const surface = Color(0xFFFFFFFF);
-  static const border = Color(0xFFE6E4DE);
-  static const mapBackground = Color(0xFFECEAE3);
-  static const progressTrack = Color(0xFFEFEDE8);
-  static const progressFill = Color(0xFF2D5BD8);
+  // Shared with the rest of the app: these come from [AppColors] so the
+  // Circle screens match everything else.
+  static const background = AppColors.surfaceSunken;
+  static const surface = AppColors.surface;
+  static const border = AppColors.border;
+  static const progressTrack = AppColors.border;
 
   /// Outline of secondary buttons and the note text area.
-  static const outline = Color(0xFFD7D4CC);
+  static const outline = AppColors.borderDark;
 
   /// Row dividers, unselected chips and weekly bars' track.
-  static const divider = Color(0xFFEFEDE8);
+  static const divider = AppColors.border;
+
+  static const ink = AppColors.ink;
+  static const secondary = AppColors.inkSoft;
+  static const muted = AppColors.inkSoft;
+
+  // "All good" green (normal heart rate, connected device).
+  static const okBackground = AppColors.primarySoft;
+  static const okText = AppColors.primaryText;
+  static const okTextDark = AppColors.primaryDark;
+
+  /// Steps progress and today's bar: the steps color (see stat_colors.dart).
+  static const stepsProgress = AppColors.primary;
+
+  /// Past days in the weekly steps chart.
+  static const stepsWeekBar = AppColors.primarySoft;
+
+  /// Active minutes progress: the workout color.
+  static const activeProgress = AppColors.orange;
+
+  // Only used by the Circle screens.
+  static const mapBackground = Color(0xFFECEAE3);
 
   /// Unselected quick-note rows.
   static const noteBackground = Color(0xFFFBFAF7);
 
-  /// Unchecked checkbox border.
+  /// Unchecked checkbox border (3:1 on white).
   static const checkboxOff = Color(0xFF8A8F99);
-
-  // "All good" green (normal heart rate, connected device).
-  static const okBackground = Color(0xFFE3F2EA);
-  static const okText = Color(0xFF0B6E4A);
-  static const okTextDark = Color(0xFF0B5A3C);
-
-  /// Active minutes progress.
-  static const active = Color(0xFFC25E00);
-
-  /// Past days in the weekly steps chart (today uses [progressFill]).
-  static const weekBar = Color(0xFFC9D6F5);
 
   /// Outline of destructive buttons (text uses [heart]).
   static const dangerOutline = Color(0xFFE8B4BD);
 
-  static const ink = Color(0xFF15171C);
-  static const secondary = Color(0xFF555B67);
-  static const muted = Color(0xFF6B717D);
   static const liveText = Color(0xFF3F4450);
 
   /// Heart rate text.
