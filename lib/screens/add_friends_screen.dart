@@ -536,7 +536,7 @@ class _SmallButton extends StatelessWidget {
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
             color: !enabled
                 ? AppColors.muted
-                : (secondary ? AppColors.inkSoft : Colors.white),
+                : (secondary ? AppColors.inkSoft : AppColors.onPrimary),
           ),
         ),
       ),

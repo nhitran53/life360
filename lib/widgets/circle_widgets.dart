@@ -71,7 +71,7 @@ class MemberAvatar extends StatelessWidget {
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.w800,
-          color: isYou ? Colors.white : CircleColors.ink,
+          color: isYou ? AppColors.onPrimary : CircleColors.ink,
         ),
       ),
     );
@@ -346,7 +346,7 @@ class CirclePillButton extends StatelessWidget {
                   style: TextStyle(
                     fontSize: fontSize,
                     fontWeight: fontWeight,
-                    color: filled ? Colors.white : textColor,
+                    color: filled ? AppColors.onPrimary : textColor,
                   ),
                 ),
               ),
@@ -448,7 +448,7 @@ class _Tab extends StatelessWidget {
                   width: 22,
                   height: 22,
                   colorFilter: active
-                      ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
+                      ? const ColorFilter.mode(AppColors.onPrimary, BlendMode.srcIn)
                       : null,
                 ),
               ),

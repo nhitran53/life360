@@ -148,7 +148,7 @@ class ChunkyButton extends StatelessWidget {
     required this.onPressed,
     this.color = AppColors.primary,
     this.edgeColor = AppColors.primaryDark,
-    this.foregroundColor = Colors.white,
+    this.foregroundColor = AppColors.onPrimary,
     this.icon,
     this.expand = true,
   });

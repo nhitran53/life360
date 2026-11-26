@@ -167,7 +167,7 @@ class _HeartBadge extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w800,
-            color: alert ? Colors.white : CircleColors.heart,
+            color: alert ? AppColors.onPrimary : CircleColors.heart,
           ),
         ),
       ],

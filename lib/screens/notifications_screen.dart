@@ -168,7 +168,7 @@ class _FilterChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: selected ? Colors.white : CircleColors.secondary,
+                color: selected ? AppColors.onPrimary : CircleColors.secondary,
               ),
             ),
           ),

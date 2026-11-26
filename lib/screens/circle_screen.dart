@@ -355,7 +355,7 @@ class _CircleLink extends StatelessWidget {
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 19, color: Colors.white),
+                child: Icon(icon, size: 19, color: AppColors.onPrimary),
               ),
               const SizedBox(width: 12),
               Expanded(

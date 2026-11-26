@@ -195,7 +195,7 @@ class _IconTile extends StatelessWidget {
         depth: AppDepth.chip,
         child: SizedBox(
           height: 53,
-          child: Icon(icon, color: Colors.white, size: 30),
+          child: Icon(icon, color: AppColors.onPrimary, size: 30),
         ),
       ),
     );

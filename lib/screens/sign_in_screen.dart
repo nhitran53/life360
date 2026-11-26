@@ -227,7 +227,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     label: 'Continue with Apple',
                     icon: Icons.apple,
                     color: AppColors.ink,
-                    edgeColor: Colors.black,
+                    edgeColor: AppColors.inkDark,
                     onPressed: _busy
                         ? null
                         : () => _run((a) => a.signInWithApple()),

@@ -367,7 +367,7 @@ class _StatsGrid extends StatelessWidget {
                   label: 'Steps',
                   value: formatNumber(member.steps),
                   progress: member.steps / circleStepGoal,
-                  progressColor: CircleColors.progressFill,
+                  progressColor: CircleColors.stepsProgress,
                 ),
               ),
               const SizedBox(width: 10),
@@ -376,7 +376,7 @@ class _StatsGrid extends StatelessWidget {
                   label: 'Active minutes',
                   value: '${member.activeMinutes} min',
                   progress: member.activeMinutes / circleActiveGoal,
-                  progressColor: CircleColors.active,
+                  progressColor: CircleColors.activeProgress,
                 ),
               ),
             ],
@@ -413,7 +413,7 @@ class _StatTile extends StatelessWidget {
     required this.label,
     required this.value,
     this.progress,
-    this.progressColor = CircleColors.progressFill,
+    this.progressColor = CircleColors.stepsProgress,
   });
 
   final String label;
@@ -524,8 +524,8 @@ class _WeekSteps extends StatelessWidget {
                       height: _barHeight * steps[i] / most,
                       decoration: BoxDecoration(
                         color: i == steps.length - 1
-                            ? CircleColors.progressFill
-                            : CircleColors.weekBar,
+                            ? CircleColors.stepsProgress
+                            : CircleColors.stepsWeekBar,
                         borderRadius: BorderRadius.circular(5),
                       ),
                     ),

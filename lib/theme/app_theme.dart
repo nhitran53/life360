@@ -22,18 +22,18 @@ abstract final class AppTheme {
   static const fontFamily = 'Plus Jakarta Sans';
 
   static OutlineInputBorder _inputBorder(Color color) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.button),
-        borderSide: BorderSide(color: color, width: 1.5),
-      );
+    borderRadius: BorderRadius.circular(AppRadius.button),
+    borderSide: BorderSide(color: color, width: 1.5),
+  );
 
   static ThemeData light() {
     const scheme = ColorScheme.light(
       primary: AppColors.primary,
-      onPrimary: Colors.white,
+      onPrimary: AppColors.onPrimary,
       secondary: AppColors.blue,
-      onSecondary: Colors.white,
+      onSecondary: AppColors.onPrimary,
       error: AppColors.red,
-      onError: Colors.white,
+      onError: AppColors.onPrimary,
       surface: AppColors.surface,
       onSurface: AppColors.ink,
       onSurfaceVariant: AppColors.inkSoft,
@@ -43,18 +43,45 @@ abstract final class AppTheme {
 
     const text = TextTheme(
       displayLarge: TextStyle(
-          fontSize: 40, fontWeight: FontWeight.w800, height: 1.05, letterSpacing: -1),
+        fontSize: 40,
+        fontWeight: FontWeight.w800,
+        height: 1.05,
+        letterSpacing: -1,
+      ),
       headlineLarge: TextStyle(
-          fontSize: 30, fontWeight: FontWeight.w700, height: 1.1, letterSpacing: -0.6),
+        fontSize: 30,
+        fontWeight: FontWeight.w700,
+        height: 1.1,
+        letterSpacing: -0.6,
+      ),
       headlineMedium: TextStyle(
-          fontSize: 24, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -0.4),
-      titleLarge: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        height: 1.15,
+        letterSpacing: -0.4,
+      ),
+      titleLarge: TextStyle(
+        fontSize: 19,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.2,
+      ),
       titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       titleSmall: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-      bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, height: 1.45),
-      bodyMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, height: 1.45),
+      bodyLarge: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        height: 1.45,
+      ),
+      bodyMedium: TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
+        height: 1.45,
+      ),
       bodySmall: TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.inkSoft),
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: AppColors.inkSoft,
+      ),
       labelLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       labelMedium: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       labelSmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -85,7 +112,10 @@ abstract final class AppTheme {
           color: AppColors.ink,
         ),
       ),
-      dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 1),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.border,
+        thickness: 1,
+      ),
       // Small green text needs the darker green to stay readable.
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(foregroundColor: AppColors.primaryText),
@@ -93,8 +123,10 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         hintStyle: const TextStyle(
           fontFamily: fontFamily,
           fontWeight: FontWeight.w500,
@@ -111,8 +143,9 @@ abstract final class AppTheme {
         errorBorder: _inputBorder(AppColors.red),
         focusedErrorBorder: _inputBorder(AppColors.red),
       ),
-      progressIndicatorTheme:
-          const ProgressIndicatorThemeData(color: AppColors.primary),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.primary,
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.ink,
@@ -120,10 +153,11 @@ abstract final class AppTheme {
           fontFamily: fontFamily,
           fontSize: 15,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: AppColors.onPrimary,
         ),
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.chip)),
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+        ),
       ),
     );
   }
