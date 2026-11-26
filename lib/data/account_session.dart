@@ -32,6 +32,7 @@ class AccountSession extends ChangeNotifier {
     this.friendsFor,
     this.sharingFor,
     this.statsDb,
+    this.practiceMode = false,
   }) {
     _sub = auth.authStateChanges().listen(_onAuthChanged);
   }
@@ -50,6 +51,10 @@ class AccountSession extends ChangeNotifier {
   /// Where daily stats are published and friends' are read. Null (mock
   /// accounts) means stats stay on the device and friends' are mock data.
   final FirebaseFirestore? statsDb;
+
+  /// True when accounts are only kept on this device because Firebase isn't
+  /// set up for the platform. The welcome and sign-in screens say so.
+  final bool practiceMode;
 
   FriendsRepository? _friends;
   SharingRepository? _sharing;

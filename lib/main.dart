@@ -23,6 +23,7 @@ import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'theme/stat_colors.dart';
 import 'widgets/chunky.dart';
+import 'widgets/practice_mode_note.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +66,7 @@ Future<AccountSession> _localSession() async {
   return AccountSession(
     auth: await MockAuthRepository.persistent(store),
     profiles: await MockProfileRepository.persistent(store),
+    practiceMode: true,
   );
 }
 
@@ -84,6 +86,7 @@ class _Friend360AppState extends State<Friend360App> {
       (_ownSession = AccountSession(
         auth: MockAuthRepository(),
         profiles: MockProfileRepository(),
+        practiceMode: true,
       ));
   AccountSession? _ownSession;
 
@@ -198,6 +201,10 @@ class _HomeScreenState extends State<HomeScreen>
                       textAlign: TextAlign.center,
                       style: text.bodySmall,
                     ),
+                    if (AccountScope.of(context).practiceMode) ...[
+                      const SizedBox(height: 16),
+                      const PracticeModeNote(),
+                    ],
                   ],
                 ),
               ),
