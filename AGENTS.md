@@ -25,9 +25,9 @@ Target users are friend groups and classmates who want light, fun accountability
 ```
 lib/
   main.dart         # App entry (Friend360App) + animated HomeScreen ("ENTER THE ARENA")
-  screens/          # one file per screen (hub_screen.dart: the menu of main screens)
+  screens/          # one file per screen (circle_screen.dart: the signed-in home)
 test/
-  widget_test.dart  # Widget tests for home → hub navigation
+  widget_test.dart  # Widget tests for welcome → sign-in and Circle home navigation
 ```
 
 As the app grows, move toward this structure (don't do it all at once, only when touching the code):
@@ -100,7 +100,7 @@ Each stat should keep the same color everywhere (sleep is always blue, screen ti
   flutter test
   ```
   All three must pass.
-- Add or update widget tests in `test/` when you add or change a screen. Existing tests check that the home → hub navigation works, so keep them green.
+- Add or update widget tests in `test/` when you add or change a screen. Existing tests check the welcome → sign-in and Circle home navigation, so keep them green.
 - **Use mock data first.** Build screens against a fake repository (`data/mock_*.dart`) so UI work doesn't wait on the backend or health integrations. Put the data source behind an interface so it can be swapped later.
 - Keep widgets small. Private widgets (`_Foo`) are fine inside a screen file. Move them to `widgets/` once two screens share them.
 - Use `withValues(alpha: …)` rather than the deprecated `withOpacity`.

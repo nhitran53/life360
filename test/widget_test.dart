@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:life360/data/device_screen_time.dart';
 import 'package:life360/data/family_store.dart';
-import 'package:life360/screens/hub_screen.dart';
 import 'package:life360/screens/friends_stats_screen.dart';
 import 'package:life360/main.dart';
 import 'package:life360/screens/circle_screen.dart';
@@ -347,18 +346,6 @@ void main() {
         expect(find.text('All friends'), findsOneWidget);
       });
 
-  testWidgets("Friends' Stats hub card opens the Friends' Stats screen",
-          (WidgetTester tester) async {
-        await tester.pumpWidget(const MaterialApp(home: HubScreen()));
-        await tester.pump(const Duration(seconds: 2));
-
-        await tester.tap(find.text("Friends' Stats"));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(FriendsStatsScreen), findsOneWidget);
-        expect(find.text('Coming soon 👀'), findsNothing);
-      });
-
   testWidgets("Circle home links to Friends' Stats",
           (WidgetTester tester) async {
         useTallPhone(tester);
@@ -374,16 +361,6 @@ void main() {
         expect(find.text("How's everyone doing?"), findsOneWidget);
       });
 
-  testWidgets('My Stats hub card opens the My Stats screen',
-          (WidgetTester tester) async {
-        await tester.pumpWidget(const MaterialApp(home: HubScreen()));
-        await tester.tap(find.text('My Stats'));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(MyStatsScreen), findsOneWidget);
-        expect(find.text('Coming soon 👀'), findsNothing);
-      });
-
   testWidgets('Ranks tab on the circle home opens the leaderboard',
           (WidgetTester tester) async {
         tester.view.physicalSize = const Size(1170, 2532);
@@ -396,25 +373,6 @@ void main() {
 
         expect(find.byType(LeaderboardScreen), findsOneWidget);
         expect(find.text('This week'), findsOneWidget);
-      });
-
-  testWidgets('Leaderboard hub card opens the leaderboard',
-          (WidgetTester tester) async {
-        await tester.pumpWidget(const MaterialApp(home: HubScreen()));
-        await tester.tap(find.text('Leaderboard'));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(LeaderboardScreen), findsOneWidget);
-      });
-
-  testWidgets('Hub shows all three destinations',
-          (WidgetTester tester) async {
-        await tester.pumpWidget(const MaterialApp(home: HubScreen()));
-        await tester.pump();
-
-        expect(find.text('My Stats'), findsOneWidget);
-        expect(find.text("Friends' Stats"), findsOneWidget);
-        expect(find.text('Leaderboard'), findsOneWidget);
       });
 
   testWidgets('Bell opens notifications, filters, and clears the dot',
