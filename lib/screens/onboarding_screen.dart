@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../theme/stat_colors.dart';
 import '../utils/format.dart';
 import '../widgets/chunky.dart';
+import '../widgets/delete_account.dart';
 
 // ---------------------------------------------------------------------------
 // ONBOARDING — after signing up: name + @username, avatar, daily goals.
@@ -261,7 +262,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         helperText: 'Letters, numbers, _ and .',
       ),
     ),
+    const SizedBox(height: 32),
+    if (AccountScope.of(context).deleteUnfinished)
+      _UnfinishedDelete(onFinish: _deleteAccount)
+    else
+      Center(
+        child: TextButton(
+          onPressed: _busy ? null : _deleteAccount,
+          style: TextButton.styleFrom(foregroundColor: AppColors.inkSoft),
+          child: const Text('Delete account'),
+        ),
+      ),
   ];
+
+  Future<void> _deleteAccount() => confirmAndDeleteAccount(
+    context,
+    onBusy: (busy) => setState(() => _busy = busy),
+  );
 
   List<Widget> _avatarStep(TextTheme text) => [
     Text('Pick your look', style: text.headlineMedium),
@@ -402,6 +419,38 @@ class _GoalRow extends StatelessWidget {
                 ? () => onChanged(value + range.step)
                 : null,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown when deleting removed the data but not the login.
+class _UnfinishedDelete extends StatelessWidget {
+  const _UnfinishedDelete({required this.onFinish});
+
+  final VoidCallback onFinish;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSunken,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            "Your data is deleted, but your login wasn't deleted yet. "
+            'Finish deleting it, or set up a new profile above.',
+            style: text.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          ChunkyButton.secondary(label: 'Finish deleting', onPressed: onFinish),
         ],
       ),
     );

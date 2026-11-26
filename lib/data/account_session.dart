@@ -82,6 +82,13 @@ class AccountSession extends ChangeNotifier {
   DailyGoals _goals = const DailyGoals();
   DailyGoals get goals => _goals;
 
+  bool _deleteUnfinished = false;
+
+  /// [deleteAccount] removed the data but not the login (e.g. Firebase
+  /// wanted a fresh sign-in). Onboarding explains this and offers to try
+  /// again. Cleared when someone else signs in or the user signs out.
+  bool get deleteUnfinished => _deleteUnfinished;
+
   /// Bumped on every auth change so a slow profile load for an old user
   /// can't overwrite a newer one.
   var _generation = 0;
@@ -89,6 +96,7 @@ class AccountSession extends ChangeNotifier {
 
   Future<void> _onAuthChanged(AuthUser? user) async {
     final generation = ++_generation;
+    if (user?.uid != _user?.uid) _deleteUnfinished = false;
     _user = user;
     if (user == null) {
       _profile = null;
@@ -213,7 +221,13 @@ class AccountSession extends ChangeNotifier {
     } on Exception catch (e) {
       // Only the kind of failure: the details could identify the user.
       debugPrint('Deleting the account failed: ${e.runtimeType}');
-      if (!_disposed && _user?.uid == user.uid) await _onAuthChanged(_user);
+      if (!_disposed && _user?.uid == user.uid) {
+        await _onAuthChanged(_user);
+        if (!_disposed && _status == AccountStatus.needsProfile) {
+          _deleteUnfinished = true;
+          notifyListeners();
+        }
+      }
       rethrow;
     }
   }

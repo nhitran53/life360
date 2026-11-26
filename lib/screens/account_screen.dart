@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/account_session.dart';
-import '../data/auth_repository.dart';
 import '../theme/app_colors.dart';
 import '../widgets/chunky.dart';
+import '../widgets/delete_account.dart';
 
 // ---------------------------------------------------------------------------
 // ACCOUNT — your profile, friend code, sign out and delete account.
@@ -40,50 +40,10 @@ class _AccountScreenState extends State<AccountScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _delete() async {
-    final session = AccountScope.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete your account?'),
-        content: const Text(
-          'Your profile, friends, goals and shared stats will be removed. '
-          "This can't be undone.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.redText),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _busy = true);
-    try {
-      await session.deleteAccount();
-    } on AuthException catch (e) {
-      _showError(
-        e.code == AuthException.requiresRecentLogin
-            ? 'For safety, log out and back in, then try again.'
-            : e.message,
-      );
-    } on Exception catch (e) {
-      // e.g. a FirebaseException from deleting the profile while offline.
-      debugPrint('Deleting the account failed: ${e.runtimeType}');
-      _showError(
-        "Couldn't delete your account. Check your connection and try again.",
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
+  Future<void> _delete() => confirmAndDeleteAccount(
+    context,
+    onBusy: (busy) => setState(() => _busy = busy),
+  );
 
   @override
   Widget build(BuildContext context) {
