@@ -424,52 +424,61 @@ class _StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = this.progress;
+    final spoken = progress == null
+        ? '$label: $value'
+        : '$label: $value, '
+              '${progress >= 1 ? 'goal hit' : '${(progress * 100).round()}% of goal'}';
 
-    return CircleCard(
-      radius: 18,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: CircleColors.secondary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: CircleColors.ink,
-            ),
-          ),
-          if (progress != null) ...[
-            const SizedBox(height: 4),
-            Container(
-              height: 6,
-              decoration: BoxDecoration(
-                color: CircleColors.progressTrack,
-                borderRadius: BorderRadius.circular(3),
+    return Semantics(
+      container: true,
+      label: spoken,
+      excludeSemantics: true,
+      child: CircleCard(
+        radius: 18,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: CircleColors.secondary,
               ),
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: progress.clamp(0.0, 1.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: progressColor,
-                    borderRadius: BorderRadius.circular(3),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: CircleColors.ink,
+              ),
+            ),
+            if (progress != null) ...[
+              const SizedBox(height: 4),
+              Container(
+                height: 6,
+                decoration: BoxDecoration(
+                  color: CircleColors.progressTrack,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: progress.clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: progressColor,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -494,66 +503,93 @@ class _WeekSteps extends StatelessWidget {
     color: CircleColors.secondary,
   );
 
+  static const _dayNames = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
+  /// "Steps this week: 54,130 in total. Monday 8,000, …, Wednesday 6,200
+  /// (today)."
+  String _spoken(int total) {
+    final days = [
+      for (var i = 0; i < steps.length && i < _dayNames.length; i++)
+        '${_dayNames[i]} ${formatNumber(steps[i])}'
+            '${i == steps.length - 1 ? ' (today)' : ''}',
+    ];
+    return 'Steps this week: ${formatNumber(total)} in total. '
+        '${days.join(', ')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = steps.fold(0, (sum, s) => sum + s);
     final most = steps.fold(1, math.max);
 
-    return CircleCard(
-      radius: 18,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Steps this week', style: _label),
-              Text(formatNumber(total), style: _label),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: _barHeight,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+    return Semantics(
+      container: true,
+      label: _spoken(total),
+      excludeSemantics: true,
+      child: CircleCard(
+        radius: 18,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                for (var i = 0; i < steps.length; i++) ...[
+                const Text('Steps this week', style: _label),
+                Text(formatNumber(total), style: _label),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: _barHeight,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (var i = 0; i < steps.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 10),
+                    Expanded(
+                      child: Container(
+                        height: _barHeight * steps[i] / most,
+                        decoration: BoxDecoration(
+                          color: i == steps.length - 1
+                              ? CircleColors.stepsProgress
+                              : CircleColors.stepsWeekBar,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                for (var i = 0; i < _days.length; i++) ...[
                   if (i > 0) const SizedBox(width: 10),
                   Expanded(
-                    child: Container(
-                      height: _barHeight * steps[i] / most,
-                      decoration: BoxDecoration(
-                        color: i == steps.length - 1
-                            ? CircleColors.stepsProgress
-                            : CircleColors.stepsWeekBar,
-                        borderRadius: BorderRadius.circular(5),
+                    child: Text(
+                      _days[i],
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: CircleColors.muted,
                       ),
                     ),
                   ),
                 ],
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              for (var i = 0; i < _days.length; i++) ...[
-                if (i > 0) const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _days[i],
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: CircleColors.muted,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
