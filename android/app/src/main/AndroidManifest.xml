@@ -14,7 +14,7 @@
         tools:ignore="ProtectedPermissions"/>
 
     <application
-        android:label="life360"
+        android:label="Friend 360"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
