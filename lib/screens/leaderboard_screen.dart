@@ -32,8 +32,11 @@ enum LeaderboardBoard {
   steps('Steps', Icons.directions_walk_rounded, StatMetric.steps),
   sleep('Sleep', Icons.bedtime_rounded, StatMetric.sleep),
   workout('Workouts', Icons.fitness_center_rounded, StatMetric.workout),
-  screenTime('Least screen time', Icons.phone_iphone_rounded,
-      StatMetric.screenTime);
+  screenTime(
+    'Least screen time',
+    Icons.phone_iphone_rounded,
+    StatMetric.screenTime,
+  );
 
   const LeaderboardBoard(this.label, this.icon, this.metric);
 
@@ -146,6 +149,25 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   String get _key => '${_family?.id ?? 'friends'}/${_board.name}';
 
+  /// The board on screen. Kept in state so rebuilding never starts a new
+  /// load; it only changes through [_show] and [_refresh].
+  late Future<_BoardData> _boardFuture = _load();
+
+  /// Shows the current family + board, reusing it if it already loaded.
+  void _show() {
+    final next = _load();
+    setState(() {
+      _boardFuture = next;
+    });
+  }
+
+  /// Drops the cached board and loads it again (retry, pull to refresh).
+  Future<void> _refresh() {
+    _cache.remove(_key);
+    _show();
+    return _boardFuture.then((_) {}, onError: (_) {});
+  }
+
   Future<_BoardData> _load() {
     final board = _board;
     final userIds = _family?.profileIds;
@@ -167,10 +189,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         entries: results[0],
         lastWeekRanks: {for (final e in results[1]) e.user.id: e.rank},
         meId: me.id,
-        youKeepPrivate: mine != null &&
-            (metric == null
-                ? mine.isPaused(now)
-                : !mine.isShared(metric, now)),
+        youKeepPrivate:
+            mine != null &&
+            (metric == null ? mine.isPaused(now) : !mine.isShared(metric, now)),
       );
     });
   }
@@ -184,13 +205,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _ScopeSheet(
-        families: _familyStore.families,
-        selected: _family,
-      ),
+      builder: (_) =>
+          _ScopeSheet(families: _familyStore.families, selected: _family),
     );
     if (choice == null || !mounted) return;
-    setState(() => _family = choice.family);
+    _family = choice.family;
+    _show();
   }
 
   @override
@@ -207,7 +227,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => MyStatsScreen(
-                    friends: _friends, stats: _stats, clock: _clock),
+                  friends: _friends,
+                  stats: _stats,
+                  clock: _clock,
+                ),
               ),
             ),
           ),
@@ -230,64 +253,79 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Expanded(child: Text('This week', style: text.headlineMedium)),
-                  const Icon(Icons.timer_outlined,
-                      size: 18, color: AppColors.inkSoft),
+                  Expanded(
+                    child: Text('This week', style: text.headlineMedium),
+                  ),
+                  const Icon(
+                    Icons.timer_outlined,
+                    size: 18,
+                    color: AppColors.inkSoft,
+                  ),
                   const SizedBox(width: 4),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(weekResetLabel(_clock()), style: text.bodySmall),
+                    child: Text(
+                      weekResetLabel(_clock()),
+                      style: text.bodySmall,
+                    ),
                   ),
                 ],
               ),
             ),
             _BoardPicker(
               selected: _board,
-              onSelected: (b) => setState(() => _board = b),
+              onSelected: (b) {
+                _board = b;
+                _show();
+              },
             ),
             Expanded(
-              child: FutureBuilder<_BoardData>(
-                future: _load(),
-                builder: (context, snapshot) {
-                  final Widget child;
-                  if (snapshot.hasError) {
-                    child = _Message(
-                      key: const ValueKey('error'),
-                      text: "Couldn't load the leaderboard. "
-                          'Check your connection and try again.',
-                      onRetry: () => setState(() => _cache.remove(_key)),
+              child: RefreshIndicator(
+                onRefresh: _refresh,
+                child: FutureBuilder<_BoardData>(
+                  future: _boardFuture,
+                  builder: (context, snapshot) {
+                    final Widget child;
+                    if (snapshot.hasError) {
+                      child = _Message(
+                        key: const ValueKey('error'),
+                        text:
+                            "Couldn't load the leaderboard. "
+                            'Check your connection and try again.',
+                        onRetry: _refresh,
+                      );
+                    } else if (!snapshot.hasData) {
+                      child = const Center(
+                        key: ValueKey('loading'),
+                        child: CircularProgressIndicator(),
+                      );
+                    } else {
+                      final family = _family;
+                      child = _BoardView(
+                        key: ValueKey(_key),
+                        board: _board,
+                        data: snapshot.data!,
+                        // Leagues are between all your friends, so they only
+                        // show on the friends-wide XP board.
+                        leagueCard:
+                            _board == LeaderboardBoard.xp && family == null
+                            ? _LeagueSlot(standing: _league)
+                            : null,
+                        // Only for a family with nobody else in it yet. A
+                        // board can also be short because people keep a
+                        // stat private; _BoardView explains that instead.
+                        soloText: family == null || family.profileIds.isNotEmpty
+                            ? null
+                            : "It's just you in ${family.name} so far. "
+                                  'Invite people to start a leaderboard 🏁',
+                      );
+                    }
+                    return AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: child,
                     );
-                  } else if (!snapshot.hasData) {
-                    child = const Center(
-                      key: ValueKey('loading'),
-                      child: CircularProgressIndicator(),
-                    );
-                  } else {
-                    final family = _family;
-                    child = _BoardView(
-                      key: ValueKey(_key),
-                      board: _board,
-                      data: snapshot.data!,
-                      // Leagues are between all your friends, so they only
-                      // show on the friends-wide XP board.
-                      leagueCard: _board == LeaderboardBoard.xp &&
-                              family == null
-                          ? _LeagueSlot(standing: _league)
-                          : null,
-                      // Only for a family with nobody else in it yet. A
-                      // board can also be short because people keep a
-                      // stat private; _BoardView explains that instead.
-                      soloText: family == null || family.profileIds.isNotEmpty
-                          ? null
-                          : "It's just you in ${family.name} so far. "
-                          'Invite people to start a leaderboard 🏁',
-                    );
-                  }
-                  return AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: child,
-                  );
-                },
+                  },
+                ),
               ),
             ),
           ],
@@ -348,9 +386,7 @@ class _BoardPicker extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     board.label,
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge
+                    style: Theme.of(context).textTheme.labelLarge
                         ?.copyWith(color: fg, letterSpacing: 0),
                   ),
                 ],
@@ -394,7 +430,8 @@ class _BoardView extends StatelessWidget {
     // empty metric board means nobody here shares it.
     if (entries.isEmpty && metric != null) {
       return _Message(
-        text: 'Nobody here shares their ${metric.label.toLowerCase()} yet 🔒'
+        text:
+            'Nobody here shares their ${metric.label.toLowerCase()} yet 🔒'
             '${data.youKeepPrivate ? '\nTurn it on in Privacy to be the first.' : ''}',
       );
     }
@@ -403,7 +440,8 @@ class _BoardView extends StatelessWidget {
         entries.length == 1 &&
         entries.single.user.id == data.meId) {
       return _Message(
-        text: "You're the only one here sharing your "
+        text:
+            "You're the only one here sharing your "
             '${metric.label.toLowerCase()} so far 🔒',
       );
     }
@@ -412,8 +450,10 @@ class _BoardView extends StatelessWidget {
     }
     if (entries.isEmpty) {
       return const _Message(
-          text: 'Add friends to start a leaderboard. '
-              "It's more fun with company!");
+        text:
+            'Add friends to start a leaderboard. '
+            "It's more fun with company!",
+      );
     }
     final top = entries.take(3).toList();
     final rest = entries.skip(3).toList();
@@ -421,6 +461,7 @@ class _BoardView extends StatelessWidget {
     final leagueCard = this.leagueCard;
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
         if (leagueCard != null) ...[leagueCard, const SizedBox(height: 16)],
@@ -451,7 +492,9 @@ class _LeagueSlot extends StatelessWidget {
     future: standing,
     builder: (context, snapshot) {
       final data = snapshot.data;
-      return data == null ? const SizedBox.shrink() : LeagueCard(standing: data);
+      return data == null
+          ? const SizedBox.shrink()
+          : LeagueCard(standing: data);
     },
   );
 }
@@ -503,8 +546,11 @@ class _Movement extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(up ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
-            color: color, size: 20),
+        Icon(
+          up ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
+          color: color,
+          size: 20,
+        ),
         Text('${d.abs()}', style: style?.copyWith(color: color)),
       ],
     );
@@ -519,20 +565,35 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(text,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge),
-            if (onRetry != null) ...[
-              const SizedBox(height: 16),
-              ChunkyButton(label: 'Try again', onPressed: onRetry, expand: false),
-            ],
-          ],
+    // Scrollable so pull to refresh works on empty and error states too.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    text,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  if (onRetry != null) ...[
+                    const SizedBox(height: 16),
+                    ChunkyButton(
+                      label: 'Try again',
+                      onPressed: onRetry,
+                      expand: false,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
